@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, FileText, Loader2, Send, Sparkles, User, RefreshCcw } from 'lucide-react';
+import { Bot, FileText, Loader2, Send, Sparkles, User, RefreshCcw, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,10 +99,10 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage, step]);
 
   useEffect(() => {
-    if (step === 'collecting-info' && !isLiaTyping) {
+    if (step === 'collecting-info' && !isLiaTyping && messages[messages.length - 1]?.sender !== 'user') {
         askNextQuestion();
     }
-  }, [step, currentField, isLiaTyping, askNextQuestion]);
+  }, [step, currentField, isLiaTyping, askNextQuestion, messages]);
 
 
   const handleTramiteSelect = useCallback((tramite: Tramite) => {
@@ -162,6 +162,36 @@ export default function TramiteFacil() {
     }, 1500);
   };
   
+  const handleStepChange = (newStepIndex: number) => {
+    const currentStepIndex = stepsList.indexOf(step);
+    if (newStepIndex >= currentStepIndex) return;
+
+    const newStep = stepsList[newStepIndex];
+    setStep(newStep);
+
+    if (newStep === 'selecting-tramite') {
+      resetState();
+    } else if (newStep === 'collecting-info') {
+      const lastUserMessageIndex = messages.map(m => m.sender).lastIndexOf('user');
+      const messagesToShow = messages.slice(0, lastUserMessageIndex + 1);
+      
+      const newCurrentField = selectedTramite ? Math.min(Object.keys(formData).length, selectedTramite.dataRequirements.length) : 0;
+      setCurrentField(newCurrentField);
+      
+      setMessages(messagesToShow);
+      setTimeout(() => {
+        addMessage('lia', 'Retomando desde aquí. ¿Qué deseas hacer?');
+      }, 200);
+    }
+  };
+
+  const goBack = () => {
+    const currentStepIndex = stepsList.indexOf(step);
+    if (currentStepIndex > 0) {
+      handleStepChange(currentStepIndex - 1);
+    }
+  };
+
   const currentStepIndex = stepsList.indexOf(step);
 
   return (
@@ -184,7 +214,11 @@ export default function TramiteFacil() {
 
       <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
         <div className="p-4 border-b">
-          <ProgressIndicator steps={stepsList.map(s => s.replace('-', ' '))} currentStep={currentStepIndex} />
+          <ProgressIndicator 
+            steps={stepsList.map(s => s.replace('-', ' '))} 
+            currentStep={currentStepIndex}
+            onStepClick={handleStepChange}
+          />
           {selectedTramite && <p className="text-center text-sm text-muted-foreground mt-2">Trámite: <strong>{selectedTramite.name}</strong></p>}
         </div>
         <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
@@ -204,19 +238,27 @@ export default function TramiteFacil() {
       </CardContent>
 
       <CardFooter className="p-4 border-t-2 border-primary/20">
-        <form onSubmit={handleUserInput} className="flex w-full items-center space-x-2">
-          <Input
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            placeholder={step === 'collecting-info' ? 'Escribe tu respuesta aquí...' : 'La conversación ha finalizado.'}
-            disabled={step !== 'collecting-info' || isLiaTyping}
-            className="flex-1 text-base"
-          />
-          <Button type="submit" size="icon" disabled={step !== 'collecting-info' || isLiaTyping || !userInput.trim()}>
-            <Send className="h-5 w-5" />
-            <span className="sr-only">Enviar</span>
-          </Button>
-        </form>
+        <div className="flex w-full items-center space-x-2">
+            {step !== 'selecting-tramite' && (
+              <Button variant="outline" size="icon" onClick={goBack} disabled={isLiaTyping}>
+                <ArrowLeft className="h-5 w-5" />
+                <span className="sr-only">Atrás</span>
+              </Button>
+            )}
+            <form onSubmit={handleUserInput} className="flex-1 flex items-center space-x-2">
+              <Input
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                placeholder={step === 'collecting-info' ? 'Escribe tu respuesta aquí...' : 'La conversación ha finalizado.'}
+                disabled={step !== 'collecting-info' || isLiaTyping}
+                className="flex-1 text-base"
+              />
+              <Button type="submit" size="icon" disabled={step !== 'collecting-info' || isLiaTyping || !userInput.trim()}>
+                <Send className="h-5 w-5" />
+                <span className="sr-only">Enviar</span>
+              </Button>
+            </form>
+        </div>
       </CardFooter>
       <div className="text-center text-xs text-muted-foreground p-2 bg-secondary rounded-b-2xl">
         TrámiteYA no es una entidad gubernamental; automatizamos el acceso a servicios públicos y te guiamos paso a paso.
