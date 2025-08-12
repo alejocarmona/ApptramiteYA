@@ -22,7 +22,7 @@ type Message = {
 };
 
 type Step = 'selecting-tramite' | 'collecting-info' | 'payment' | 'processing-document' | 'document-ready' | 'error';
-const stepsList: Step[] = ['selecting-tramite', 'collecting-info', 'payment', 'document-ready'];
+const stepsList: (Step | 'processing-document' | 'error')[] = ['selecting-tramite', 'collecting-info', 'payment', 'document-ready'];
 
 const initialState = {
   messages: [],
@@ -99,7 +99,7 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage, step]);
 
   useEffect(() => {
-    if (step === 'collecting-info' && !isLiaTyping && messages[messages.length - 1]?.sender !== 'user') {
+    if (step === 'collecting-info' && !isLiaTyping && messages.length > 0 && messages[messages.length - 1]?.sender === 'user') {
         askNextQuestion();
     }
   }, [step, currentField, isLiaTyping, askNextQuestion, messages]);
@@ -113,8 +113,9 @@ export default function TramiteFacil() {
       addMessage('lia', `¡Excelente elección! Para el ${tramite.name}, necesitaré algunos datos.`);
       setStep('collecting-info');
       setCurrentField(0);
+       setTimeout(() => askNextQuestion(), 500);
     }, 1000);
-  }, [addMessage]);
+  }, [addMessage, askNextQuestion]);
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -166,7 +167,7 @@ export default function TramiteFacil() {
     const currentStepIndex = stepsList.indexOf(step);
     if (newStepIndex >= currentStepIndex) return;
 
-    const newStep = stepsList[newStepIndex];
+    const newStep = stepsList[newStepIndex] as Step;
     setStep(newStep);
 
     if (newStep === 'selecting-tramite') {
@@ -181,6 +182,9 @@ export default function TramiteFacil() {
       setMessages(messagesToShow);
       setTimeout(() => {
         addMessage('lia', 'Retomando desde aquí. ¿Qué deseas hacer?');
+         if (newCurrentField < selectedTramite!.dataRequirements.length) {
+          askNextQuestion();
+        }
       }, 200);
     }
   };
