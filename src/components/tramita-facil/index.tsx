@@ -83,34 +83,38 @@ export default function TramiteFacil() {
   }, [messages]);
 
   const askNextQuestion = useCallback(() => {
-    if (!selectedTramite) return;
-
-    if (currentField < selectedTramite.dataRequirements.length) {
-      const field = selectedTramite.dataRequirements[currentField];
-      addMessage('lia', `Por favor, ingresa tu ${field.label.toLowerCase()}:`);
-    } else {
-      setIsLiaTyping(true);
-      setTimeout(() => {
+    if (!selectedTramite || step !== 'collecting-info') return;
+  
+    setIsLiaTyping(true);
+    setTimeout(() => {
+      if (currentField < selectedTramite.dataRequirements.length) {
+        const field = selectedTramite.dataRequirements[currentField];
+        addMessage('lia', `Por favor, ingresa tu ${field.label.toLowerCase()}:`);
+      } else {
         addMessage('lia', `¡Perfecto! Hemos reunido toda la información. El costo del trámite es de ${selectedTramite.priceCop.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}.`);
         setStep('payment');
-        setIsLiaTyping(false);
-      }, 1000);
+      }
+      setIsLiaTyping(false);
+    }, 500);
+  }, [selectedTramite, currentField, addMessage, step]);
+
+  useEffect(() => {
+    if (step === 'collecting-info' && !isLiaTyping) {
+        askNextQuestion();
     }
-  }, [selectedTramite, currentField, addMessage]);
+  }, [step, currentField, isLiaTyping, askNextQuestion]);
 
 
   const handleTramiteSelect = useCallback((tramite: Tramite) => {
     addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
     setSelectedTramite(tramite);
-    setStep('collecting-info');
-    setIsLiaTyping(true);
+    
     setTimeout(() => {
-      setIsLiaTyping(false);
       addMessage('lia', `¡Excelente elección! Para el ${tramite.name}, necesitaré algunos datos.`);
+      setStep('collecting-info');
       setCurrentField(0);
-      askNextQuestion();
     }, 1000);
-  }, [addMessage, askNextQuestion]);
+  }, [addMessage]);
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -125,12 +129,6 @@ export default function TramiteFacil() {
     
     setUserInput('');
     setCurrentField(prev => prev + 1);
-    
-    setIsLiaTyping(true);
-    setTimeout(() => {
-      setIsLiaTyping(false);
-      askNextQuestion();
-    }, 500);
   };
 
   const handlePaymentSuccess = () => {
