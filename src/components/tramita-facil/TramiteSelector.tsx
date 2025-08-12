@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { TRAMITES, Tramite } from '@/lib/tramites';
-import { FileText } from 'lucide-react';
+import { FileText, ArrowRight } from 'lucide-react';
 
 type TramiteSelectorProps = {
   onSelect: (tramite: Tramite) => void;
@@ -10,20 +10,27 @@ type TramiteSelectorProps = {
 
 export default function TramiteSelector({ onSelect }: TramiteSelectorProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
       {TRAMITES.map((tramite) => (
-        <Button
+        <Card
           key={tramite.id}
-          variant="outline"
-          className="h-auto justify-start text-left p-3 bg-background hover:bg-primary/10 hover:border-primary/50"
+          className="p-4 flex flex-col justify-between cursor-pointer transition-all hover:shadow-md hover:border-primary/50 bg-background"
           onClick={() => onSelect(tramite)}
         >
-          <FileText className="w-5 h-5 mr-3 shrink-0" />
-          <div className="flex flex-col">
-            <span className="font-semibold">{tramite.name}</span>
-            <span className="text-xs text-muted-foreground">{tramite.description}</span>
+          <div className="flex items-start gap-4">
+            <FileText className="w-6 h-6 mr-3 shrink-0 text-primary" />
+            <div className="flex flex-col overflow-hidden">
+              <span className="font-semibold truncate">{tramite.name}</span>
+              <p className="text-xs text-muted-foreground mt-1 break-words whitespace-pre-wrap">
+                {tramite.description}
+              </p>
+            </div>
           </div>
-        </Button>
+          <div className="flex justify-end items-center mt-4">
+            <span className="text-xs font-semibold text-primary">Seleccionar</span>
+            <ArrowRight className="w-4 h-4 ml-2 text-primary" />
+          </div>
+        </Card>
       ))}
     </div>
   );
