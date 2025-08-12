@@ -115,6 +115,8 @@ export default function TramiteFacil() {
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!userInput.trim() || isLiaTyping || step !== 'collecting-info' || !selectedTramite) return;
+    
+    if (currentField >= selectedTramite.dataRequirements.length) return;
 
     addMessage('user', userInput);
     
