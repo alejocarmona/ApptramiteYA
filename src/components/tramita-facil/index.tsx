@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TRAMITES, Tramite } from '@/lib/tramites';
-import { useLiaToFillInFields } from '@/ai/flows/use-lia-to-fill-in-fields';
 import { useToast } from '@/hooks/use-toast';
 import ChatBubble from './ChatBubble';
 import TramiteSelector from './TramiteSelector';
@@ -154,10 +153,22 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage, step]);
 
   useEffect(() => {
-    if (step === 'collecting-info' && !isLiaTyping && messages[messages.length - 1]?.sender !== 'lia' && selectedTramite) {
-        askNextQuestion();
+    if (step === 'collecting-info' && !isLiaTyping && selectedTramite) {
+      const lastMessage = messages[messages.length - 1];
+      if (!lastMessage) return;
+
+      const isLastMessageFromLia = lastMessage.sender === 'lia';
+      
+      // Ask first question right after tramite selection and LIA's confirmation.
+      if (currentField === 0 && isLastMessageFromLia && messages.length < 3) {
+          askNextQuestion();
+      }
+      // Ask next question only after user has replied.
+      else if (currentField > 0 && !isLastMessageFromLia) {
+          askNextQuestion();
+      }
     }
-  }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite]);
+  }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite, currentField]);
 
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
@@ -219,7 +230,6 @@ export default function TramiteFacil() {
   }
 
   const handleStepChange = (newStepIndex: number) => {
-    const currentStepName = stepsList[currentStepIndex];
     const newStepName = stepsList[newStepIndex];
     const newStep = stepNameToEnum(newStepName);
     
