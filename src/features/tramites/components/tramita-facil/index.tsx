@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   FileCheck2,
   ChevronDown,
-  Star
+  Star,
 } from 'lucide-react';
 import {
   Card,
@@ -30,7 +30,7 @@ import Payment from '../Payment';
 import DocumentDownloader from '../DocumentDownloader';
 import ProgressIndicator from '../ProgressIndicator';
 import {Progress} from '@/components/ui/progress';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -92,7 +92,9 @@ function DocumentGenerationProgress() {
     <div className="space-y-3 p-2">
       <div className="flex items-center justify-center gap-2">
         <Loader2 className="animate-spin text-primary" />
-        <span className="font-semibold text-primary-foreground">Estamos generando tu documento...</span>
+        <span className="font-semibold text-primary-foreground">
+          Estamos generando tu documento...
+        </span>
       </div>
       <div className="space-y-2">
         <Progress value={progress} className="h-2 w-full" />
@@ -111,20 +113,23 @@ function DocumentGenerationProgress() {
 
 function WelcomeHero() {
   const scrollToTramites = () => {
-    document.getElementById('tramite-selector')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'});
   };
   return (
-    <div className="text-center p-4 rounded-lg bg-card">
-      <Avatar className="mx-auto h-16 w-16 mb-4 border-4 border-primary/20 bg-primary/10">
-        <AvatarFallback className='bg-transparent'>
-          <Bot className="h-8 w-8 text-primary"/>
+    <div className="rounded-lg bg-card p-4 text-center">
+      <Avatar className="mx-auto mb-4 h-16 w-16 border-4 border-primary/20 bg-primary/10">
+        <AvatarFallback className="bg-transparent">
+          <Bot className="h-8 w-8 text-primary" />
         </AvatarFallback>
       </Avatar>
-      <h2 className="text-2xl font-bold text-foreground">Obtén tus documentos oficiales en minutos</h2>
-      <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-        Soy LIA, tu asistente virtual. Te guiaré paso a paso para que completes tus trámites sin complicaciones.
+      <h2 className="text-2xl font-bold text-foreground">
+        Obtén tus documentos oficiales en minutos
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+        Soy LIA, tu asistente virtual. Te guiaré paso a paso para que completes
+        tus trámites sin complicaciones.
       </p>
-      <div className="text-sm mt-4 text-left inline-block bg-muted/40 p-3 rounded-md">
+      <div className="mt-4 inline-block rounded-md bg-muted/40 p-3 text-left text-sm">
         <p>1. Elige tu trámite.</p>
         <p>2. Ingresa tus datos.</p>
         <p>3. Paga de forma segura.</p>
@@ -132,17 +137,17 @@ function WelcomeHero() {
       </div>
       <div className="mt-6">
         <Button onClick={scrollToTramites} size="lg">
-          Empezar ahora <ChevronDown className="ml-2 h-4 w-4"/>
+          Empezar ahora <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 function SuccessCelebration() {
   return (
     <div className="relative overflow-hidden rounded-lg p-4 text-center">
-       {Array.from({ length: 15 }).map((_, i) => (
+      {Array.from({length: 15}).map((_, i) => (
         <div
           key={i}
           className="confetti-piece"
@@ -150,26 +155,29 @@ function SuccessCelebration() {
             left: `${Math.random() * 100}%`,
             animationDelay: `${Math.random() * 3}s`,
             transform: `rotate(${Math.random() * 360}deg)`,
-            backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`
+            backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`,
           }}
         />
       ))}
       <div className="flex flex-col items-center gap-2">
-          <FileCheck2 className="text-green-500 h-12 w-12" />
-          <span className="text-xl font-semibold">¡Tu documento está listo para descargar!</span>
-          <p className="text-sm text-muted-foreground">¿Te fue útil? ¡Ayúdanos a mejorar!</p>
-          <div className="flex gap-1 text-yellow-400 mt-2">
-            {[...Array(5)].map((_, i) => (
-              <button key={i} className="transition-transform hover:scale-125">
-                 <Star className="w-6 h-6" fill="currentColor" />
-              </button>
-            ))}
-          </div>
+        <FileCheck2 className="h-12 w-12 text-green-500" />
+        <span className="text-xl font-semibold">
+          ¡Tu documento está listo para descargar!
+        </span>
+        <p className="text-sm text-muted-foreground">
+          ¿Te fue útil? ¡Ayúdanos a mejorar!
+        </p>
+        <div className="mt-2 flex gap-1 text-yellow-400">
+          {[...Array(5)].map((_, i) => (
+            <button key={i} className="transition-transform hover:scale-125">
+              <Star className="h-6 w-6" fill="currentColor" />
+            </button>
+          ))}
+        </div>
       </div>
     </div>
-  )
+  );
 }
-
 
 export default function TramiteFacil() {
   const [messages, setMessages] = useState<Message[]>(initialState.messages);
@@ -208,7 +216,9 @@ export default function TramiteFacil() {
           'lia',
           <>
             <p>¡Excelente elección!</p>
-            <p>Para el <strong>{tramite.name}</strong>, necesitaré algunos datos.</p>
+            <p>
+              Para el <strong>{tramite.name}</strong>, necesitaré algunos datos.
+            </p>
           </>
         );
         setStep('collecting-info');
@@ -228,7 +238,12 @@ export default function TramiteFacil() {
 
     setTimeout(() => {
       addMessage('lia', <WelcomeHero />);
-      addMessage('lia', <div id="tramite-selector"><TramiteSelector onSelect={handleTramiteSelect} /></div>);
+      addMessage(
+        'lia',
+        <div id="tramite-selector">
+          <TramiteSelector onSelect={handleTramiteSelect} />
+        </div>
+      );
     }, 100);
   }, [addMessage, handleTramiteSelect]);
 
@@ -268,26 +283,23 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage, step]);
 
   useEffect(() => {
-    if (
-      step === 'collecting-info' &&
-      !isLiaTyping &&
-      messages.length > 0 &&
-      messages[messages.length - 1]?.sender === 'user' &&
-      selectedTramite
-    ) {
-      const isInitialQuestion = messages.filter(m => m.sender === 'lia').length <= 2
-      if(!isInitialQuestion) {
+    if (step === 'collecting-info' && !isLiaTyping && selectedTramite) {
+      const lastMessage = messages[messages.length - 1];
+      const isLiaLastSender = lastMessage?.sender === 'lia';
+      // Ask first question right after tramite selection
+      if (
+        messages.filter((m) => m.sender === 'user').length === 1 &&
+        messages.filter((m) => m.sender === 'lia').length === 2 &&
+        currentField === 0
+      ) {
+        askNextQuestion();
+      }
+      // Ask next question after user has replied
+      else if (lastMessage?.sender === 'user' && currentField > 0) {
         askNextQuestion();
       }
     }
-  }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite]);
-
-  useEffect(() => {
-    if (step === 'collecting-info' && selectedTramite && messages.filter(m => m.sender === 'user').length === 1) {
-        askNextQuestion();
-    }
-  }, [step, selectedTramite, messages, askNextQuestion]);
-
+  }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite, currentField]);
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -444,7 +456,10 @@ export default function TramiteFacil() {
               />
             ))}
             {isLiaTyping && step !== 'processing-document' && (
-              <ChatBubble sender="lia" content={<Loader2 className="animate-spin" />} />
+              <ChatBubble
+                sender="lia"
+                content={<Loader2 className="animate-spin" />}
+              />
             )}
             {step === 'payment' && selectedTramite && (
               <ChatBubble
@@ -461,7 +476,9 @@ export default function TramiteFacil() {
             {step === 'document-ready' && selectedTramite && (
               <ChatBubble
                 sender="lia"
-                content={<DocumentDownloader tramiteName={selectedTramite.name} />}
+                content={
+                  <DocumentDownloader tramiteName={selectedTramite.name} />
+                }
               />
             )}
           </div>
