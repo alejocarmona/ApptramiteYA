@@ -5,8 +5,7 @@ export const env = createEnv({
   server: {
     // WOMPI
     WOMPI_SECRET: z.string().min(1),
-    NEXT_PUBLIC_WOMPI_PUBLIC_KEY: z.string().min(1),
-
+    
     // GENKIT / GEMINI
     GEMINI_API_KEY: z.string().min(1),
   },
