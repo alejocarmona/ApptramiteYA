@@ -1,5 +1,7 @@
 import type {NextConfig} from 'next';
+import {env} from './src/config/env.ts';
 
+/** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {

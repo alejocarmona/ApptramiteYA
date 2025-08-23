@@ -1,4 +1,4 @@
-import TramiteFacil from "@/components/tramita-facil";
+import TramiteFacil from "@/features/tramites/components/tramita-facil";
 
 export default function Home() {
   return (
