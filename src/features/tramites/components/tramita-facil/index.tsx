@@ -290,7 +290,6 @@ export default function TramiteFacil() {
       if (!lastMessage) return;
 
       const isLastMessageFromLia = lastMessage.sender === 'lia';
-      const userHasReplied = messages.some(m => m.sender === 'user');
       
       // Ask first question right after tramite selection and LIA's confirmation.
       if (currentField === 0 && isLastMessageFromLia && messages.length < 3) {
@@ -355,7 +354,7 @@ export default function TramiteFacil() {
 
   const stepNameToEnum = (stepName: string): Step => {
     const map: Record<string, Step> = {
-      'Selecciona tu trámite': 'selecting-ramite',
+      'Selecciona tu trámite': 'selecting-tramite',
       'Ingresa tu información': 'collecting-info',
       'Paga seguro': 'payment',
       'Documento listo': 'document-ready',
@@ -527,5 +526,3 @@ export default function TramiteFacil() {
     </Card>
   );
 }
-
-    
