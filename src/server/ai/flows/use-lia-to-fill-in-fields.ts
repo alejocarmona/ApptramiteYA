@@ -8,40 +8,14 @@
  */
 
 import {ai} from '@/server/ai/genkit';
-import {z} from 'genkit';
+import {
+  UseLiaToFillInFieldsInputSchema,
+  UseLiaToFillInFieldsOutputSchema,
+  type UseLiaToFillInFieldsInput,
+  type UseLiaToFillInFieldsOutput,
+} from '@/ai/schemas/lia-schemas';
 
-const UseLiaToFillInFieldsInputSchema = z.object({
-  tramiteId: z
-    .string()
-    .describe('The ID of the trámite for which to fill in fields.'),
-  availableFields: z
-    .array(z.string())
-    .describe('The fields available to be filled in.'),
-  userInput: z
-    .string()
-    .describe('The user input, which could be a question or an answer.'),
-});
-export type UseLiaToFillInFieldsInput = z.infer<
-  typeof UseLiaToFillInFieldsInputSchema
->;
-
-const UseLiaToFillInFieldsOutputSchema = z.object({
-  filledFields: z
-    .record(z.string(), z.string())
-    .describe('The fields that have been filled in, with their values.'),
-  nextQuestion: z
-    .string()
-    .optional()
-    .describe('The next question to ask the user, if any.'),
-  isComplete: z.boolean().describe('Whether all required fields have been filled.'),
-});
-export type UseLiaToFillInFieldsOutput = z.infer<
-  typeof UseLiaToFillInFieldsOutputSchema
->;
-
-export async function useLiaToFillInFields(
-  input: UseLiaToFillInFieldsInput
-): Promise<UseLiaToFillInFieldsOutput> {
+export async function useLiaToFillInFields(input: UseLiaToFillInFieldsInput): Promise<UseLiaToFillInFieldsOutput> {
   return useLiaToFillInFieldsFlow(input);
 }
 
@@ -77,7 +51,7 @@ const useLiaToFillInFieldsFlow = ai.defineFlow(
     inputSchema: UseLiaToFillInFieldsInputSchema,
     outputSchema: UseLiaToFillInFieldsOutputSchema,
   },
-  async (input) => {
+  async input => {
     const {output} = await prompt(input);
     return output!;
   }

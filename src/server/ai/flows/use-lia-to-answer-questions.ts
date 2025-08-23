@@ -8,21 +8,15 @@
  */
 
 import {ai} from '@/server/ai/genkit';
-import {z} from 'genkit';
+import {
+  AskLiaQuestionInputSchema,
+  AskLiaQuestionOutputSchema,
+  type AskLiaQuestionInput,
+  type AskLiaQuestionOutput,
+} from '@/ai/schemas/lia-schemas';
 
-const AskLiaQuestionInputSchema = z.object({
-  question: z.string().describe('The user question about a specific process.'),
-});
-export type AskLiaQuestionInput = z.infer<typeof AskLiaQuestionInputSchema>;
 
-const AskLiaQuestionOutputSchema = z.object({
-  answer: z.string().describe("LIA's answer to the user question."),
-});
-export type AskLiaQuestionOutput = z.infer<typeof AskLiaQuestionOutputSchema>;
-
-export async function askLiaQuestion(
-  input: AskLiaQuestionInput
-): Promise<AskLiaQuestionOutput> {
+export async function askLiaQuestion(input: AskLiaQuestionInput): Promise<AskLiaQuestionOutput> {
   return askLiaQuestionFlow(input);
 }
 
@@ -43,7 +37,7 @@ const askLiaQuestionFlow = ai.defineFlow(
     inputSchema: AskLiaQuestionInputSchema,
     outputSchema: AskLiaQuestionOutputSchema,
   },
-  async (input) => {
+  async input => {
     const {output} = await prompt(input);
     return output!;
   }
