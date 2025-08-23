@@ -111,7 +111,7 @@ export const createWompiTransaction = functions.https.onRequest(
         transactionId,
       });
 
-    } catch (error) => {
+    } catch (error) {
       console.error("Wompi payment initiation failed:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
