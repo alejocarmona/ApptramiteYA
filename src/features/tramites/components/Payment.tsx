@@ -28,11 +28,17 @@ export default function Payment({
   const handlePayment = async () => {
     setIsProcessing(true);
     
+    // The URL for the Firebase Function.
+    // In a real app, this would come from an environment variable.
+    const functionUrl = `https://us-central1-${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.cloudfunctions.net/createWompiTransaction`;
+
     try {
-      // 1. Call the new API Route
-      const response = await fetch('/api/payments/wompi', {
+      const response = await fetch(functionUrl, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({
           tramiteId: tramiteName, // Assuming name is unique for now
           tramiteName: tramiteName,
@@ -40,16 +46,23 @@ export default function Payment({
           formData,
         }),
       });
+      
+      const resultText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(resultText);
+      } catch (e) {
+        throw new Error(`Respuesta inválida del servidor: ${resultText}`);
+      }
 
-      const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.detail || result.error || 'Ocurrió un error al procesar el pago.');
       }
       
-      // 2. Pass transactionId to parent and simulate payment success
       onPaymentInitiation(result.transactionId);
 
+      // Simulate Wompi checkout and callback
       setTimeout(() => {
         onPaymentSuccess();
         setIsProcessing(false);

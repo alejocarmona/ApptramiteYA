@@ -13,6 +13,8 @@ const WompiPaymentRequestSchema = z.object({
   formData: z.record(z.string(), z.any()),
 });
 
+// This API route is now deprecated and will be replaced by a Firebase Function.
+// It is kept here for reference but should not be used.
 export async function POST(req: NextRequest) {
   try {
     // 2. Validate request body
@@ -42,20 +44,7 @@ export async function POST(req: NextRequest) {
     
     // In a real scenario, you would now make a fetch call to Wompi's API
     // using the WOMPI_SECRET from env vars and the data received.
-    // For this example, we will simulate a successful call.
-    //
-    // const wompiResponse = await fetch(env.WOMPI_URL, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${env.WOMPI_SECRET}`
-    //   },
-    //   body: JSON.stringify({ ... })
-    // });
-    //
-    // if (!wompiResponse.ok) {
-    //   // Handle Wompi API errors
-    // }
+    // This is now handled by the createWompiTransaction Firebase Function.
 
     // 4. Return a clear JSON response
     return NextResponse.json({
