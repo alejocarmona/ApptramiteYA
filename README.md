@@ -32,6 +32,7 @@ These are required for the payment processing to work.
 
 ```
 # This is your PUBLIC key for the Wompi API, safe to be on the client.
+# Note: The private key is configured directly in Firebase Functions, not here.
 NEXT_PUBLIC_WOMPI_PUBLIC_KEY=
 ```
 
@@ -43,20 +44,21 @@ Payment processing is handled by a Firebase Cloud Function (`createWompiTransact
 
 Run the following commands in your terminal, replacing the placeholder values with your actual Wompi credentials:
 
+### Sandbox/Testing Environment
 ```bash
-firebase functions:config:set wompi.private="YOUR_WOMPI_PRIVATE_KEY" wompi.url="https://sandbox.wompi.co/v1/transactions"
+firebase functions:config:set wompi.private="prv_test_YOUR_WOMPI_SANDBOX_PRIVATE_KEY" wompi.url="https://sandbox.wompi.co/v1"
 ```
 
-For a production environment, change the URL to Wompi's production endpoint:
-
+### Production Environment
+For a production environment, change the URL to Wompi's production endpoint and use your production private key:
 ```bash
-firebase functions:config:set wompi.private="YOUR_WOMPI_PRODUCTION_PRIVATE_KEY" wompi.url="https://production.wompi.co/v1/transactions"
+firebase functions:config:set wompi.private="prv_prod_YOUR_WOMPI_PRODUCTION_PRIVATE_KEY" wompi.url="https://production.wompi.co/v1"
 ```
 
-After setting the configuration, deploy your functions:
+After setting the configuration, deploy your functions. Make sure you are deploying to the correct region (e.g., `us-central1`).
 
 ```bash
 firebase deploy --only functions
 ```
 
-The frontend application will call this function directly. The function URL is constructed dynamically using your `NEXT_PUBLIC_FIREBASE_PROJECT_ID`.
+The frontend application will call this function directly using the Firebase Functions SDK. The function's region must be specified correctly on the client-side when initializing the SDK.
