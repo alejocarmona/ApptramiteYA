@@ -12,6 +12,7 @@ import {
   FileCheck2,
   ChevronDown,
   Star,
+  RefreshCcw,
 } from 'lucide-react';
 import {
   Card,
@@ -140,17 +141,23 @@ function WelcomeHero() {
   );
 }
 
-function SuccessCelebration() {
+function SuccessCelebration({onReset}: {onReset: () => void}) {
+  const [rated, setRated] = useState(false);
+  
+  const handleRating = () => {
+    setRated(true);
+    // In a real app, you would send this rating to your analytics
+  };
+
   return (
     <div className="relative overflow-hidden rounded-lg p-4 text-center">
-      {Array.from({length: 15}).map((_, i) => (
+      {!rated && Array.from({length: 15}).map((_, i) => (
         <div
           key={i}
           className="confetti-piece"
           style={{
             left: `${Math.random() * 100}%`,
             animationDelay: `${Math.random() * 3}s`,
-            transform: `rotate(${Math.random() * 360}deg)`,
             backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`,
           }}
         />
@@ -160,16 +167,38 @@ function SuccessCelebration() {
         <span className="text-xl font-semibold">
           ¡Tu documento está listo para descargar!
         </span>
-        <p className="text-sm text-muted-foreground">
-          ¿Te fue útil? ¡Ayúdanos a mejorar!
-        </p>
-        <div className="mt-2 flex gap-1 text-yellow-400">
-          {[...Array(5)].map((_, i) => (
-            <button key={i} className="transition-transform hover:scale-125">
-              <Star className="h-6 w-6" fill="currentColor" />
+        
+        {rated ? (
+          <div className='flex flex-col items-center gap-2 mt-2'>
+            <p className="text-sm text-muted-foreground">
+              ¡Gracias por tus comentarios!
+            </p>
+            <button
+              onClick={onReset}
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              👉 Generar otro documento
             </button>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              ¿Te fue útil? ¡Ayúdanos a mejorar!
+            </p>
+            <div className="mt-2 flex gap-1 text-yellow-400">
+              {[...Array(5)].map((_, i) => (
+                <button 
+                  key={i} 
+                  className="transition-transform hover:scale-125"
+                  onClick={handleRating}
+                  aria-label={`Calificar con ${i + 1} estrellas`}
+                >
+                  <Star className="h-6 w-6" fill="currentColor" />
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -286,11 +315,9 @@ export default function TramiteFacil() {
 
       const isLastMessageFromLia = lastMessage.sender === 'lia';
       
-      // Ask first question right after tramite selection and LIA's confirmation.
       if (currentField === 0 && isLastMessageFromLia && messages.length < 3) {
           askNextQuestion();
       }
-      // Ask next question only after user has replied.
       else if (currentField > 0 && !isLastMessageFromLia) {
           askNextQuestion();
       }
@@ -342,7 +369,7 @@ export default function TramiteFacil() {
       setTimeout(() => {
         setStep('document-ready');
         setIsLiaTyping(false);
-        addMessage('lia', <SuccessCelebration />);
+        addMessage('lia', <SuccessCelebration onReset={resetState} />);
       }, 7000); // Total generation time
     }, 500);
   };
@@ -376,6 +403,10 @@ export default function TramiteFacil() {
             <p className="text-sm text-muted-foreground">Asistente LIA</p>
           </div>
         </div>
+         <Button variant="ghost" size="icon" onClick={resetState}>
+          <RefreshCcw className="h-5 w-5" />
+          <span className="sr-only">Reiniciar conversación</span>
+        </Button>
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -423,7 +454,10 @@ export default function TramiteFacil() {
               <ChatBubble
                 sender="lia"
                 content={
-                  <DocumentDownloader tramiteName={selectedTramite.name} />
+                  <DocumentDownloader 
+                    tramiteName={selectedTramite.name}
+                    onReset={resetState}
+                  />
                 }
               />
             )}
