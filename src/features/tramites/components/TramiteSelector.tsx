@@ -4,6 +4,7 @@ import {Card} from '@/components/ui/card';
 import {TRAMITES, Tramite} from '@/features/tramites/lib/tramites';
 import {FileText, ArrowRight, CheckCircle2} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type TramiteSelectorProps = {
   onSelect: (tramite: Tramite) => void;
@@ -11,11 +12,14 @@ type TramiteSelectorProps = {
 
 export default function TramiteSelector({onSelect}: TramiteSelectorProps) {
   return (
-    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div 
+      className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 600px' }}
+    >
       {TRAMITES.map((tramite) => (
         <Card
           key={tramite.id}
-          className="group flex cursor-pointer flex-col justify-between bg-card p-4 ring-1 ring-transparent transition-all hover:shadow-lg hover:ring-primary/50"
+          className="group flex cursor-pointer flex-col justify-between p-4 ring-1 ring-transparent transition-all hover:shadow-lg hover:ring-primary/50"
           onClick={() => onSelect(tramite)}
         >
           <div>
@@ -35,11 +39,19 @@ export default function TramiteSelector({onSelect}: TramiteSelectorProps) {
                 {tramite.benefit}
             </Badge>
           </div>
-          <div className="mt-4 flex items-center justify-end">
+          <div className="mt-4 flex min-h-[44px] items-center justify-end">
             <span className="text-xs font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
               Seleccionar
             </span>
-            <ArrowRight className="ml-2 h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
+            <div 
+              aria-label={`Seleccionar ${tramite.name}`} 
+              className="ml-2 flex items-center justify-center min-w-[44px]"
+            >
+              <ArrowRight 
+                className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" 
+                style={{ willChange: 'transform' }}
+              />
+            </div>
           </div>
         </Card>
       ))}

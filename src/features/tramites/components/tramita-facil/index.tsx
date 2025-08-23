@@ -33,6 +33,7 @@ import {Progress} from '@/components/ui/progress';
 import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useLiaToFillInFields } from '@/server/ai/flows/use-lia-to-fill-in-fields';
+import { useKeyboardPadding } from '@/hooks/use-keyboard-padding';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -118,10 +119,10 @@ function WelcomeHero() {
     document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'});
   };
   return (
-    <div className="rounded-lg bg-card p-4 text-center">
-      <Avatar className="mx-auto mb-4 h-16 w-16 border-4 border-primary/20 bg-primary/10">
+    <div className="rounded-lg bg-card p-4 py-4 sm:py-6 text-center">
+      <Avatar className="mx-auto mb-4 h-12 w-12 sm:h-16 sm:w-16 border-4 border-primary/20 bg-primary/10">
         <AvatarFallback className="bg-transparent">
-          <Bot className="h-8 w-8 text-primary" />
+          <Bot className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
         </AvatarFallback>
       </Avatar>
       <h2 className="text-2xl font-bold text-foreground">
@@ -131,14 +132,14 @@ function WelcomeHero() {
         Soy LIA, tu asistente virtual. Te guiaré paso a paso para que completes
         tus trámites sin complicaciones.
       </p>
-      <div className="mt-4 inline-block rounded-md bg-muted/40 p-3 text-left text-sm">
+      <div className="mt-4 inline-block rounded-md bg-muted/40 p-3 text-left text-sm leading-tight">
         <p>1. Elige tu trámite.</p>
         <p>2. Ingresa tus datos.</p>
         <p>3. Paga de forma segura.</p>
         <p>4. Descarga tu documento.</p>
       </div>
       <div className="mt-6">
-        <Button onClick={scrollToTramites} size="lg">
+        <Button onClick={scrollToTramites} size="lg" className="w-full sm:w-auto min-h-[44px]">
           Empezar ahora <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -200,6 +201,7 @@ export default function TramiteFacil() {
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
+  const keyboardPadding = useKeyboardPadding();
 
   const addMessage = useCallback(
     (sender: 'user' | 'lia', content: React.ReactNode) => {
@@ -418,7 +420,10 @@ export default function TramiteFacil() {
   const currentStepIndex = getStepIndex(step);
 
   return (
-    <Card className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl">
+    <Card 
+      className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl"
+      style={{ paddingBottom: keyboardPadding }}
+    >
       <CardHeader className="flex flex-row items-center justify-between border-b">
         <div className="flex items-center gap-3">
           <div className="rounded-full bg-primary/10 p-2">
@@ -433,21 +438,25 @@ export default function TramiteFacil() {
         </div>
       </CardHeader>
 
-      <div className="sticky top-0 z-20 border-b bg-card/80 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+      <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <FlowStepper
           steps={stepsList}
           currentStep={currentStepIndex}
           onStepClick={handleStepChange}
         />
         {selectedTramite && (
-          <p className="mt-2 text-center text-xs text-muted-foreground">
+          <p className="border-t border-border/50 py-1 text-center text-xs text-muted-foreground">
             Trámite: <strong>{selectedTramite.name}</strong>
           </p>
         )}
       </div>
 
       <CardContent className="flex flex-1 flex-col overflow-hidden p-0">
-        <ScrollArea className="flex-1" ref={scrollAreaRef} aria-live="polite">
+        <ScrollArea 
+          className="flex-1 [padding-top:env(safe-area-inset-top)]" 
+          ref={scrollAreaRef} 
+          aria-live="polite"
+        >
           <div className="space-y-6 p-6">
             {messages.map((msg) => (
               <ChatBubble
@@ -487,7 +496,7 @@ export default function TramiteFacil() {
       </CardContent>
 
       <div className={cn(
-          "sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60",
+          "sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-bottom:env(safe-area-inset-bottom)]",
           step !== 'collecting-info' && 'hidden'
       )}>
         <div className="flex w-full items-center space-x-2">
@@ -497,6 +506,7 @@ export default function TramiteFacil() {
               onClick={goBack}
               disabled={isLiaTyping}
               aria-label="Atrás"
+              className='min-h-[44px] min-w-[44px]'
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -509,7 +519,7 @@ export default function TramiteFacil() {
               onChange={(e) => setUserInput(e.target.value)}
               placeholder={'Escribe tu respuesta aquí...'}
               disabled={isLiaTyping}
-              className="flex-1 text-base"
+              className="flex-1 text-base h-11"
               aria-label="Entrada de usuario"
             />
             <Button
@@ -517,6 +527,7 @@ export default function TramiteFacil() {
               size="icon"
               disabled={isLiaTyping || !userInput.trim()}
               aria-label="Enviar mensaje"
+              className='min-h-[44px] min-w-[44px]'
             >
               <Send className="h-5 w-5" />
             </Button>
