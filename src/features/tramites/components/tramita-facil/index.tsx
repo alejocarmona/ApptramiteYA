@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {useState, useRef, useEffect, useCallback} from 'react';
@@ -62,6 +63,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { buttonVariants } from '@/components/ui/button';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -124,10 +126,10 @@ function WelcomeHero() {
     document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'});
   };
   return (
-    <div className="rounded-lg bg-card p-4 py-4 sm:py-6 text-center">
-      <Avatar className="mx-auto mb-4 h-12 w-12 sm:h-16 sm:w-16 border-4 border-primary/20 bg-primary/10">
+    <div className="rounded-lg bg-card p-4 py-4 text-center sm:py-6">
+      <Avatar className="mx-auto mb-4 h-12 w-12 border-4 border-primary/20 bg-primary/10 sm:h-16 sm:w-16">
         <AvatarFallback className="bg-transparent">
-          <Bot className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+          <Bot className="h-6 w-6 text-primary sm:h-8 sm:w-8" />
         </AvatarFallback>
       </Avatar>
       <h2 className="text-2xl font-bold text-foreground">
@@ -147,7 +149,7 @@ function WelcomeHero() {
         <Button
           onClick={scrollToTramites}
           size="lg"
-          className="w-full sm:w-auto min-h-[44px]"
+          className="min-h-[44px] w-full sm:w-auto"
         >
           Empezar ahora <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
@@ -240,6 +242,33 @@ export default function TramiteFacil() {
     []
   );
 
+  const handleTramiteSelect = useCallback(
+    (tramite: Tramite) => {
+      addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
+      setSelectedTramite(tramite);
+      setFlowState({
+        step: 2,
+        status: 'filling',
+        tramiteId: tramite.id,
+      });
+      setFormData({});
+      setCurrentField(0);
+
+      setTimeout(() => {
+        addMessage(
+          'lia',
+          <>
+            <p>¡Excelente elección!</p>
+            <p>
+              Para el <strong>{tramite.name}</strong>, necesitaré algunos datos.
+            </p>
+          </>
+        );
+      }, 500);
+    },
+    [addMessage]
+  );
+  
   const resetState = useCallback((fromCancel = false) => {
     setFlowState(initialFlow);
     setMessages([]);
@@ -328,37 +357,9 @@ export default function TramiteFacil() {
     </AlertDialog>
   );
 
-
-  const handleTramiteSelect = useCallback(
-    (tramite: Tramite) => {
-      addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
-      setSelectedTramite(tramite);
-      setFlowState({
-        step: 2,
-        status: 'filling',
-        tramiteId: tramite.id,
-      });
-      setFormData({});
-      setCurrentField(0);
-
-      setTimeout(() => {
-        addMessage(
-          'lia',
-          <>
-            <p>¡Excelente elección!</p>
-            <p>
-              Para el <strong>{tramite.name}</strong>, necesitaré algunos datos.
-            </p>
-          </>
-        );
-      }, 500);
-    },
-    [addMessage]
-  );
-
   useEffect(() => {
     resetState();
-  }, []);
+  }, [resetState]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -401,9 +402,12 @@ export default function TramiteFacil() {
     ) {
       const isLastMessageFromLia = lastMessage.sender === 'lia';
 
+      // Ask first question right after tramite selection and LIA's confirmation.
       if (currentField === 0 && isLastMessageFromLia && messages.length < 3) {
         askNextQuestion();
-      } else if (currentField > 0 && !isLastMessageFromLia) {
+      }
+      // Ask next question only after user has replied.
+      else if (currentField > 0 && !isLastMessageFromLia) {
         askNextQuestion();
       }
     }
@@ -636,3 +640,5 @@ export default function TramiteFacil() {
     </Card>
   );
 }
+
+    
