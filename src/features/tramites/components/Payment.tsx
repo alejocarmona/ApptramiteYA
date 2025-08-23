@@ -9,34 +9,58 @@ import {Separator} from '@/components/ui/separator';
 type PaymentProps = {
   price: number;
   tramiteName: string;
-  onPaymentInitiation: () => Promise<string | null>;
+  formData: Record<string, string>;
+  onPaymentInitiation: (transactionId: string) => void;
   onPaymentSuccess: () => void;
+  onPaymentError: (message: string) => void;
 };
 
 export default function Payment({
   price,
   tramiteName,
+  formData,
   onPaymentInitiation,
   onPaymentSuccess,
+  onPaymentError,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handlePayment = async () => {
     setIsProcessing(true);
     
-    // 1. Create a transaction document in Firestore
-    const transactionId = await onPaymentInitiation();
-    if (!transactionId) {
-        setIsProcessing(false);
-        // Toast with error is shown by the parent component
-        return;
-    }
+    try {
+      // 1. Call the new API Route
+      const response = await fetch('/api/payments/wompi', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          tramiteId: tramiteName, // Assuming name is unique for now
+          tramiteName: tramiteName,
+          amount: price,
+          formData,
+        }),
+      });
 
-    // 2. Simulate API call to payment gateway
-    setTimeout(() => {
-      onPaymentSuccess();
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || result.error || 'Ocurrió un error al procesar el pago.');
+      }
+      
+      // 2. Pass transactionId to parent and simulate payment success
+      onPaymentInitiation(result.transactionId);
+
+      setTimeout(() => {
+        onPaymentSuccess();
+        setIsProcessing(false);
+      }, 2000);
+
+    } catch (error) {
+      console.error("Payment failed:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      onPaymentError(`No pudimos iniciar el proceso de pago. Detalle: ${errorMessage}`);
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
   const serviceFee = 2500;

@@ -36,14 +36,11 @@ import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 import {cn} from '@/lib/utils';
 import {useKeyboardPadding} from '@/hooks/use-keyboard-padding';
 import {
-  createTransaction,
   markTransactionAsDelivered,
   cancelTransaction,
 } from '@/server/db/collections';
 import type {
   FlowContext,
-  FlowStep,
-  FlowStatus,
 } from '@/server/db/schema';
 import {initialFlow} from '@/server/db/schema';
 import {
@@ -441,34 +438,16 @@ export default function TramiteFacil() {
     setCurrentField((prev) => prev + 1);
   };
 
-  const handlePaymentInitiation = async () => {
-    if (!selectedTramite) {
-      toast({
-        title: 'Error',
-        description: 'No hay un trámite seleccionado.',
+  const handlePaymentInitiation = (transactionId: string) => {
+      setFlowState((prev) => ({...prev, transactionId }));
+  };
+
+  const handlePaymentError = (message: string) => {
+    toast({
+        title: 'Error de Pago',
+        description: message,
         variant: 'destructive',
-      });
-      return null;
-    }
-    try {
-      const newTransactionId = await createTransaction({
-        tramiteId: selectedTramite.id,
-        tramiteName: selectedTramite.name,
-        amount: selectedTramite.priceCop,
-        formData,
-      });
-      setFlowState((prev) => ({...prev, transactionId: newTransactionId}));
-      return newTransactionId;
-    } catch (error) {
-      console.error('Failed to create transaction:', error);
-      toast({
-        title: 'Error de Sistema',
-        description:
-          'No pudimos iniciar el proceso de pago. Por favor, intenta de nuevo.',
-        variant: 'destructive',
-      });
-      return null;
-    }
+    });
   };
 
   const handlePaymentSuccess = async () => {
@@ -575,8 +554,10 @@ export default function TramiteFacil() {
                   <Payment
                     tramiteName={selectedTramite.name}
                     price={selectedTramite.priceCop}
+                    formData={formData}
                     onPaymentInitiation={handlePaymentInitiation}
                     onPaymentSuccess={handlePaymentSuccess}
+                    onPaymentError={handlePaymentError}
                   />
                 }
               />
