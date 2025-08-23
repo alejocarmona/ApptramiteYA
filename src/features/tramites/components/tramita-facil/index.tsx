@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {useState, useRef, useEffect, useCallback} from 'react';
@@ -286,17 +287,18 @@ export default function TramiteFacil() {
   useEffect(() => {
     if (step === 'collecting-info' && !isLiaTyping && selectedTramite) {
       const lastMessage = messages[messages.length - 1];
-      // Ask first question right after tramite selection
-      if (
-        messages.filter((m) => m.sender === 'user').length === 1 &&
-        lastMessage?.sender === 'lia' &&
-        currentField === 0
-      ) {
-        askNextQuestion();
+      if (!lastMessage) return;
+
+      const isLastMessageFromLia = lastMessage.sender === 'lia';
+      const userHasReplied = messages.some(m => m.sender === 'user');
+      
+      // Ask first question right after tramite selection and LIA's confirmation.
+      if (currentField === 0 && isLastMessageFromLia && messages.length < 3) {
+          askNextQuestion();
       }
-      // Ask next question after user has replied
-      else if (lastMessage?.sender === 'user' && currentField > 0) {
-        askNextQuestion();
+      // Ask next question only after user has replied.
+      else if (currentField > 0 && !isLastMessageFromLia) {
+          askNextQuestion();
       }
     }
   }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite, currentField]);
@@ -353,7 +355,7 @@ export default function TramiteFacil() {
 
   const stepNameToEnum = (stepName: string): Step => {
     const map: Record<string, Step> = {
-      'Selecciona tu trámite': 'selecting-tramite',
+      'Selecciona tu trámite': 'selecting-ramite',
       'Ingresa tu información': 'collecting-info',
       'Paga seguro': 'payment',
       'Documento listo': 'document-ready',
@@ -525,3 +527,5 @@ export default function TramiteFacil() {
     </Card>
   );
 }
+
+    
