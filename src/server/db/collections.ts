@@ -1,5 +1,4 @@
 'use server';
-import {z} from 'zod';
 import {firestore} from '@/server/lib/firebase';
 import {
   collection,
@@ -8,44 +7,8 @@ import {
   doc,
   updateDoc,
 } from 'firebase/firestore';
-
-// Note: Using a lightweight Zod-based schema. In a larger app,
-// you might use a more robust solution like zod-to-json-schema.
-
-/**
- * Base document schema for all Firestore documents.
- */
-const BaseDocSchema = z.object({
-  id: z.string(),
-  createdAt: z.any().optional(),
-  updatedAt: z.any().optional(),
-});
-
-/**
- * Transaction document schema.
- * Represents a specific transaction for a trámite order.
- */
-export const TransactionDocSchema = BaseDocSchema.extend({
-  tramiteId: z.string(),
-  tramiteName: z.string(),
-  amount: z.number().positive(),
-  currency: z.string().default('COP'),
-  status: z.enum(['pending', 'paid', 'failed', 'delivered']),
-  formData: z.record(z.string(), z.any()),
-  wompiId: z.string().optional(),
-  paidAt: z.any().optional(),
-  deliveredAt: z.any().optional(),
-});
-export type TransactionDoc = z.infer<typeof TransactionDocSchema>;
-
-/**
- * Path builders for Firestore collections.
- * Ensures type-safe and consistent path creation.
- */
-export const collections = {
-  transactions: () => 'transactions',
-  transaction: (id: string) => `transactions/${id}`,
-};
+import type {TransactionDoc} from './schema';
+import {collections} from './schema';
 
 /**
  * Creates a new transaction document in Firestore.
@@ -106,6 +69,27 @@ export async function markTransactionAsDelivered(transactionId: string) {
   await updateDoc(transactionRef, {
     status: 'delivered',
     deliveredAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Cancels a transaction document.
+ * @param transactionId The ID of the transaction to cancel.
+ * @param reason Optional reason for cancellation.
+ */
+export async function cancelTransaction(
+  transactionId: string,
+  reason?: string
+) {
+  const transactionRef = doc(
+    firestore,
+    collections.transaction(transactionId)
+  );
+  await updateDoc(transactionRef, {
+    status: 'cancelled',
+    cancelledAt: serverTimestamp(),
+    cancellationReason: reason || 'cancelled_by_user',
     updatedAt: serverTimestamp(),
   });
 }

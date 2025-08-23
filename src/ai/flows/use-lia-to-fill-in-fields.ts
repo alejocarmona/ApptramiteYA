@@ -3,26 +3,15 @@
  * @fileOverview An AI agent that uses LIA to automatically fill in fields by asking the user questions.
  *
  * - useLiaToFillInFields - A function that handles the process of using LIA to fill in fields.
- * - UseLiaToFillInFieldsInput - The input type for the useLiaToFillInFields function.
- * - UseLiaToFillInFieldsOutput - The return type for the useLiaToFillInFields function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
-
-const UseLiaToFillInFieldsInputSchema = z.object({
-  tramiteId: z.string().describe('The ID of the trámite for which to fill in fields.'),
-  availableFields: z.array(z.string()).describe('The fields available to be filled in.'),
-  userInput: z.string().describe('The user input, which could be a question or an answer.'),
-});
-export type UseLiaToFillInFieldsInput = z.infer<typeof UseLiaToFillInFieldsInputSchema>;
-
-const UseLiaToFillInFieldsOutputSchema = z.object({
-  filledFields: z.record(z.string(), z.string()).describe('The fields that have been filled in, with their values.'),
-  nextQuestion: z.string().optional().describe('The next question to ask the user, if any.'),
-  isComplete: z.boolean().describe('Whether all required fields have been filled.'),
-});
-export type UseLiaToFillInFieldsOutput = z.infer<typeof UseLiaToFillInFieldsOutputSchema>;
+import {
+  UseLiaToFillInFieldsInputSchema,
+  UseLiaToFillInFieldsOutputSchema,
+  type UseLiaToFillInFieldsInput,
+  type UseLiaToFillInFieldsOutput,
+} from '@/ai/schemas/lia-schemas';
 
 export async function useLiaToFillInFields(input: UseLiaToFillInFieldsInput): Promise<UseLiaToFillInFieldsOutput> {
   return useLiaToFillInFieldsFlow(input);

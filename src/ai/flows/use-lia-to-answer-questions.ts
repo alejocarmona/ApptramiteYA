@@ -3,22 +3,16 @@
  * @fileOverview An AI agent that uses LIA to answer user questions about processes.
  *
  * - askLiaQuestion - A function that handles the question answering process.
- * - AskLiaQuestionInput - The input type for the askLiaQuestion function.
- * - AskLiaQuestionOutput - The return type for the askLiaQuestion function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {
+  AskLiaQuestionInputSchema,
+  AskLiaQuestionOutputSchema,
+  type AskLiaQuestionInput,
+  type AskLiaQuestionOutput,
+} from '@/ai/schemas/lia-schemas';
 
-const AskLiaQuestionInputSchema = z.object({
-  question: z.string().describe('The user question about a specific process.'),
-});
-export type AskLiaQuestionInput = z.infer<typeof AskLiaQuestionInputSchema>;
-
-const AskLiaQuestionOutputSchema = z.object({
-  answer: z.string().describe('LIA\'s answer to the user question.'),
-});
-export type AskLiaQuestionOutput = z.infer<typeof AskLiaQuestionOutputSchema>;
 
 export async function askLiaQuestion(input: AskLiaQuestionInput): Promise<AskLiaQuestionOutput> {
   return askLiaQuestionFlow(input);

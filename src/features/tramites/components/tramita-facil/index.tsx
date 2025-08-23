@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Star,
   RefreshCcw,
+  MoreVertical,
 } from 'lucide-react';
 import {
   Card,
@@ -36,30 +37,36 @@ import {useKeyboardPadding} from '@/hooks/use-keyboard-padding';
 import {
   createTransaction,
   markTransactionAsDelivered,
+  cancelTransaction,
 } from '@/server/db/collections';
+import type {
+  FlowContext,
+  FlowStep,
+  FlowStatus,
+} from '@/server/db/schema';
+import {initialFlow} from '@/server/db/schema';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 type Message = {
   sender: 'user' | 'lia';
   content: React.ReactNode;
   id: number;
-};
-
-type Step =
-  | 'selecting-tramite'
-  | 'collecting-info'
-  | 'payment'
-  | 'processing-document'
-  | 'document-ready'
-  | 'error';
-
-const initialState = {
-  messages: [],
-  step: 'selecting-tramite' as Step,
-  selectedTramite: null,
-  formData: {},
-  currentField: 0,
-  isLiaTyping: false,
-  transactionId: null,
 };
 
 function DocumentGenerationProgress() {
@@ -137,7 +144,11 @@ function WelcomeHero() {
         <p>4. Descarga tu documento.</p>
       </div>
       <div className="mt-6">
-        <Button onClick={scrollToTramites} size="lg" className="w-full sm:w-auto min-h-[44px]">
+        <Button
+          onClick={scrollToTramites}
+          size="lg"
+          className="w-full sm:w-auto min-h-[44px]"
+        >
           Empezar ahora <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -147,7 +158,7 @@ function WelcomeHero() {
 
 function SuccessCelebration({onReset}: {onReset: () => void}) {
   const [rated, setRated] = useState(false);
-  
+
   const handleRating = () => {
     setRated(true);
     // In a real app, you would send this rating to your analytics
@@ -155,25 +166,26 @@ function SuccessCelebration({onReset}: {onReset: () => void}) {
 
   return (
     <div className="relative overflow-hidden rounded-lg p-4 text-center">
-      {!rated && Array.from({length: 15}).map((_, i) => (
-        <div
-          key={i}
-          className="confetti-piece"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`,
-          }}
-        />
-      ))}
+      {!rated &&
+        Array.from({length: 15}).map((_, i) => (
+          <div
+            key={i}
+            className="confetti-piece"
+            style={{
+              left: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`,
+            }}
+          />
+        ))}
       <div className="flex flex-col items-center gap-2">
         <FileCheck2 className="h-12 w-12 text-green-500" />
         <span className="text-xl font-semibold">
           ¡Tu documento está listo para descargar!
         </span>
-        
+
         {rated ? (
-          <div className='flex flex-col items-center gap-2 mt-2'>
+          <div className="mt-2 flex flex-col items-center gap-2">
             <p className="text-sm text-muted-foreground">
               ¡Gracias por tus comentarios!
             </p>
@@ -191,8 +203,8 @@ function SuccessCelebration({onReset}: {onReset: () => void}) {
             </p>
             <div className="mt-2 flex gap-1 text-yellow-400">
               {[...Array(5)].map((_, i) => (
-                <button 
-                  key={i} 
+                <button
+                  key={i}
                   className="transition-transform hover:scale-125"
                   onClick={handleRating}
                   aria-label={`Calificar con ${i + 1} estrellas`}
@@ -209,24 +221,13 @@ function SuccessCelebration({onReset}: {onReset: () => void}) {
 }
 
 export default function TramiteFacil() {
-  const [messages, setMessages] = useState<Message[]>(initialState.messages);
-  const [step, setStep] = useState<Step>(initialState.step);
-  const [selectedTramite, setSelectedTramite] = useState<Tramite | null>(
-    initialState.selectedTramite
-  );
-  const [formData, setFormData] = useState<Record<string, string>>(
-    initialState.formData
-  );
-  const [currentField, setCurrentField] = useState<number>(
-    initialState.currentField
-  );
-  const [isLiaTyping, setIsLiaTyping] = useState<boolean>(
-    initialState.isLiaTyping
-  );
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [flowState, setFlowState] = useState<FlowContext>(initialFlow);
+  const [selectedTramite, setSelectedTramite] = useState<Tramite | null>(null);
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [currentField, setCurrentField] = useState<number>(0);
+  const [isLiaTyping, setIsLiaTyping] = useState<boolean>(false);
   const [userInput, setUserInput] = useState('');
-  const [transactionId, setTransactionId] = useState<string | null>(
-    initialState.transactionId
-  );
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
@@ -239,10 +240,106 @@ export default function TramiteFacil() {
     []
   );
 
+  const resetState = useCallback((fromCancel = false) => {
+    setFlowState(initialFlow);
+    setMessages([]);
+    setSelectedTramite(null);
+    setFormData({});
+    setCurrentField(0);
+    setIsLiaTyping(false);
+    setUserInput('');
+
+    if (fromCancel) {
+       toast({
+        title: "Proceso cancelado",
+        description: "Puedes iniciar un nuevo trámite cuando quieras.",
+      });
+    }
+
+    setTimeout(() => {
+      addMessage('lia', <WelcomeHero />);
+      addMessage(
+        'lia',
+        <div id="tramite-selector">
+          <TramiteSelector onSelect={handleTramiteSelect} />
+        </div>
+      );
+    }, 100);
+  }, [addMessage, handleTramiteSelect, toast]);
+
+
+  const handleCancelFlow = useCallback(
+    async (reason?: string) => {
+      if (flowState.transactionId) {
+        try {
+          await cancelTransaction(flowState.transactionId, reason);
+        } catch (error) {
+          console.error("Failed to cancel transaction:", error);
+          // Non-critical, proceed with UI reset
+        }
+      }
+      resetState(true);
+    },
+    [flowState.transactionId, resetState]
+  );
+  
+  const OverflowMenu = () => (
+    <AlertDialog>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Más opciones">
+            <MoreVertical className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => setFlowState(prev => ({...prev, step: 1, status: 'selecting'}))}>
+            Cambiar trámite
+          </DropdownMenuItem>
+          <AlertDialogTrigger asChild>
+            <DropdownMenuItem className="text-destructive" onSelect={(e) => e.preventDefault()}>
+              Cancelar proceso
+            </DropdownMenuItem>
+          </AlertDialogTrigger>
+          <DropdownMenuItem>Ayuda</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Cancelar proceso?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se borrará el progreso de este trámite. Esta acción no se puede deshacer.
+             {flowState.status === 'paying' && flowState.transactionId && (
+              <p className="mt-2 text-amber-600">
+                Tu pago no fue procesado. Si ves un cargo pendiente, se reversará automáticamente.
+              </p>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Volver</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => handleCancelFlow(flowState.status === 'paying' ? 'payment_pending' : 'cancelled_by_user')}
+            className={cn(buttonVariants({variant: 'destructive'}))}
+          >
+            Cancelar Proceso
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+
   const handleTramiteSelect = useCallback(
     (tramite: Tramite) => {
       addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
       setSelectedTramite(tramite);
+      setFlowState({
+        step: 2,
+        status: 'filling',
+        tramiteId: tramite.id,
+      });
+      setFormData({});
+      setCurrentField(0);
 
       setTimeout(() => {
         addMessage(
@@ -254,36 +351,14 @@ export default function TramiteFacil() {
             </p>
           </>
         );
-        setStep('collecting-info');
       }, 500);
     },
     [addMessage]
   );
 
-  const resetState = useCallback(() => {
-    setMessages(initialState.messages);
-    setStep(initialState.step);
-    setSelectedTramite(initialState.selectedTramite);
-    setFormData(initialState.formData);
-    setCurrentField(initialState.currentField);
-    setIsLiaTyping(initialState.isLiaTyping);
-    setTransactionId(initialState.transactionId);
-    setUserInput('');
-
-    setTimeout(() => {
-      addMessage('lia', <WelcomeHero />);
-      addMessage(
-        'lia',
-        <div id="tramite-selector">
-          <TramiteSelector onSelect={handleTramiteSelect} />
-        </div>
-      );
-    }, 100);
-  }, [addMessage, handleTramiteSelect]);
-
   useEffect(() => {
     resetState();
-  }, [resetState]);
+  }, []);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -295,7 +370,7 @@ export default function TramiteFacil() {
   }, [messages]);
 
   const askNextQuestion = useCallback(() => {
-    if (!selectedTramite || step !== 'collecting-info') return;
+    if (!selectedTramite || flowState.status !== 'filling') return;
 
     setIsLiaTyping(true);
     setTimeout(() => {
@@ -310,34 +385,36 @@ export default function TramiteFacil() {
             <span>¡Perfecto! Hemos reunido toda la información.</span>
           </div>
         );
-        setStep('payment');
+        setFlowState((prev) => ({...prev, step: 3, status: 'paying'}));
       }
       setIsLiaTyping(false);
     }, 500);
-  }, [selectedTramite, currentField, addMessage, step]);
+  }, [selectedTramite, currentField, addMessage, flowState.status]);
 
   useEffect(() => {
-    if (step === 'collecting-info' && !isLiaTyping && selectedTramite) {
-      const lastMessage = messages[messages.length - 1];
-      if (!lastMessage) return;
-
+    const lastMessage = messages[messages.length - 1];
+    if (
+      flowState.status === 'filling' &&
+      !isLiaTyping &&
+      selectedTramite &&
+      lastMessage
+    ) {
       const isLastMessageFromLia = lastMessage.sender === 'lia';
-      
+
       if (currentField === 0 && isLastMessageFromLia && messages.length < 3) {
-          askNextQuestion();
-      }
-      else if (currentField > 0 && !isLastMessageFromLia) {
-          askNextQuestion();
+        askNextQuestion();
+      } else if (currentField > 0 && !isLastMessageFromLia) {
+        askNextQuestion();
       }
     }
-  }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite, currentField]);
+  }, [flowState.status, isLiaTyping, askNextQuestion, messages, selectedTramite, currentField]);
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (
       !userInput.trim() ||
       isLiaTyping ||
-      step !== 'collecting-info' ||
+      flowState.status !== 'filling' ||
       !selectedTramite
     )
       return;
@@ -361,7 +438,14 @@ export default function TramiteFacil() {
   };
 
   const handlePaymentInitiation = async () => {
-    if (!selectedTramite) return;
+    if (!selectedTramite) {
+      toast({
+        title: 'Error',
+        description: 'No hay un trámite seleccionado.',
+        variant: 'destructive',
+      });
+      return null;
+    }
     try {
       const newTransactionId = await createTransaction({
         tramiteId: selectedTramite.id,
@@ -369,7 +453,7 @@ export default function TramiteFacil() {
         amount: selectedTramite.priceCop,
         formData,
       });
-      setTransactionId(newTransactionId);
+      setFlowState((prev) => ({...prev, transactionId: newTransactionId}));
       return newTransactionId;
     } catch (error) {
       console.error('Failed to create transaction:', error);
@@ -391,20 +475,17 @@ export default function TramiteFacil() {
         <span>Pago aprobado. ¡Gracias!</span>
       </div>
     );
-    setStep('processing-document');
+    setFlowState((prev) => ({...prev, status: 'generating'}));
     setIsLiaTyping(true);
 
-    // This is where a real webhook would have already marked the transaction as paid.
-    // For simulation, we'll manually call a "webhook".
-    if (transactionId) {
-      // This simulates the webhook call
+    if (flowState.transactionId) {
       await fetch('/api/webhooks/wompi', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           data: {
             transaction: {
-              transactionId: transactionId,
+              transactionId: flowState.transactionId,
               wompiId: `wompi_${Date.now()}`,
             },
           },
@@ -414,34 +495,23 @@ export default function TramiteFacil() {
 
     setTimeout(() => {
       addMessage('lia', <DocumentGenerationProgress />);
-      // Simulate document generation
       setTimeout(async () => {
-        if (transactionId) {
-          await markTransactionAsDelivered(transactionId);
+        if (flowState.transactionId) {
+          await markTransactionAsDelivered(flowState.transactionId);
         }
-        setStep('document-ready');
+        setFlowState((prev) => ({...prev, step: 4, status: 'completed'}));
         setIsLiaTyping(false);
-        addMessage('lia', <SuccessCelebration onReset={resetState} />);
-      }, 7000); // Total generation time
+        addMessage('lia', <SuccessCelebration onReset={() => resetState(false)} />);
+      }, 7000);
     }, 500);
   };
 
-  const getStepIndex = (step: Step): 1 | 2 | 3 | 4 => {
-    const mapping: Record<Step, 1 | 2 | 3 | 4> = {
-      'selecting-tramite': 1,
-      'collecting-info': 2,
-      'payment': 3,
-      'processing-document': 3, 
-      'document-ready': 4,
-      'error': 1, // default to first step on error
-    };
-    return mapping[step];
-  };
+  const currentStep = flowState.step;
 
   return (
-    <Card 
+    <Card
       className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl"
-      style={{ paddingBottom: keyboardPadding }}
+      style={{paddingBottom: keyboardPadding}}
     >
       <CardHeader className="flex flex-row items-center justify-between border-b">
         <div className="flex items-center gap-3">
@@ -455,14 +525,11 @@ export default function TramiteFacil() {
             <p className="text-sm text-muted-foreground">Asistente LIA</p>
           </div>
         </div>
-         <Button variant="ghost" size="icon" onClick={resetState}>
-          <RefreshCcw className="h-5 w-5" />
-          <span className="sr-only">Reiniciar conversación</span>
-        </Button>
+        {currentStep > 1 ? <OverflowMenu /> : <div style={{width: 40}} />}
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <AdaptiveStepper current={getStepIndex(step)} />
+        <AdaptiveStepper current={currentStep as 1 | 2 | 3 | 4} />
         {selectedTramite && (
           <p className="border-t border-border/50 py-1 text-center text-xs text-muted-foreground">
             Trámite: <strong>{selectedTramite.name}</strong>
@@ -471,12 +538,19 @@ export default function TramiteFacil() {
       </div>
 
       <CardContent className="flex flex-1 flex-col overflow-hidden p-0">
-        <ScrollArea 
-          className="flex-1 [padding-top:env(safe-area-inset-top)]" 
-          ref={scrollAreaRef} 
+        <ScrollArea
+          className="flex-1 [padding-top:env(safe-area-inset-top)]"
+          ref={scrollAreaRef}
           aria-live="polite"
         >
-          <div className="space-y-6 p-6">
+          <div className={cn("p-6", currentStep !== 1 && "hidden")}>
+             <WelcomeHero />
+             <div id="tramite-selector">
+                <TramiteSelector onSelect={handleTramiteSelect} />
+             </div>
+          </div>
+        
+          <div className={cn("space-y-6 p-6", currentStep === 1 && "hidden")}>
             {messages.map((msg) => (
               <ChatBubble
                 key={msg.id}
@@ -484,13 +558,13 @@ export default function TramiteFacil() {
                 content={msg.content}
               />
             ))}
-            {isLiaTyping && step !== 'processing-document' && (
+            {isLiaTyping && flowState.status !== 'generating' && (
               <ChatBubble
                 sender="lia"
                 content={<Loader2 className="animate-spin" />}
               />
             )}
-            {step === 'payment' && selectedTramite && (
+            {flowState.status === 'paying' && selectedTramite && (
               <ChatBubble
                 sender="lia"
                 content={
@@ -503,13 +577,13 @@ export default function TramiteFacil() {
                 }
               />
             )}
-            {step === 'document-ready' && selectedTramite && (
+            {flowState.status === 'completed' && selectedTramite && (
               <ChatBubble
                 sender="lia"
                 content={
-                  <DocumentDownloader 
+                  <DocumentDownloader
                     tramiteName={selectedTramite.name}
-                    onReset={resetState}
+                    onReset={() => resetState(false)}
                   />
                 }
               />
@@ -518,21 +592,23 @@ export default function TramiteFacil() {
         </ScrollArea>
       </CardContent>
 
-      <div className={cn(
-          "sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-bottom:env(safe-area-inset-bottom)]",
-          step !== 'collecting-info' && 'hidden'
-      )}>
+      <div
+        className={cn(
+          'sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-bottom:env(safe-area-inset-bottom)]',
+          flowState.status !== 'filling' && 'hidden'
+        )}
+      >
         <div className="flex w-full items-center space-x-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setStep('selecting-tramite')}
-              disabled={isLiaTyping}
-              aria-label="Atrás"
-              className='min-h-[44px] min-w-[44px]'
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setFlowState(prev => ({...prev, step: 1, status: 'selecting'}))}
+            disabled={isLiaTyping}
+            aria-label="Atrás"
+            className="min-h-[44px] min-w-[44px]"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <form
             onSubmit={handleUserInput}
             className="flex flex-1 items-center space-x-2"
@@ -542,7 +618,7 @@ export default function TramiteFacil() {
               onChange={(e) => setUserInput(e.target.value)}
               placeholder={'Escribe tu respuesta aquí...'}
               disabled={isLiaTyping}
-              className="flex-1 text-base h-11"
+              className="h-11 flex-1 text-base"
               aria-label="Entrada de usuario"
             />
             <Button
@@ -550,7 +626,7 @@ export default function TramiteFacil() {
               size="icon"
               disabled={isLiaTyping || !userInput.trim()}
               aria-label="Enviar mensaje"
-              className='min-h-[44px] min-w-[44px]'
+              className="min-h-[44px] min-w-[44px]"
             >
               <Send className="h-5 w-5" />
             </Button>
