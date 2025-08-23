@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {useState, useRef, useEffect, useCallback} from 'react';
@@ -32,8 +31,12 @@ import DocumentDownloader from '../DocumentDownloader';
 import AdaptiveStepper from './AdaptiveStepper';
 import {Progress} from '@/components/ui/progress';
 import {Avatar, AvatarFallback} from '@/components/ui/avatar';
-import { cn } from '@/lib/utils';
-import { useKeyboardPadding } from '@/hooks/use-keyboard-padding';
+import {cn} from '@/lib/utils';
+import {useKeyboardPadding} from '@/hooks/use-keyboard-padding';
+import {
+  createTransaction,
+  markTransactionAsDelivered,
+} from '@/server/db/collections';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -56,6 +59,7 @@ const initialState = {
   formData: {},
   currentField: 0,
   isLiaTyping: false,
+  transactionId: null,
 };
 
 function DocumentGenerationProgress() {
@@ -220,6 +224,9 @@ export default function TramiteFacil() {
     initialState.isLiaTyping
   );
   const [userInput, setUserInput] = useState('');
+  const [transactionId, setTransactionId] = useState<string | null>(
+    initialState.transactionId
+  );
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
@@ -260,6 +267,7 @@ export default function TramiteFacil() {
     setFormData(initialState.formData);
     setCurrentField(initialState.currentField);
     setIsLiaTyping(initialState.isLiaTyping);
+    setTransactionId(initialState.transactionId);
     setUserInput('');
 
     setTimeout(() => {
@@ -352,7 +360,30 @@ export default function TramiteFacil() {
     setCurrentField((prev) => prev + 1);
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentInitiation = async () => {
+    if (!selectedTramite) return;
+    try {
+      const newTransactionId = await createTransaction({
+        tramiteId: selectedTramite.id,
+        tramiteName: selectedTramite.name,
+        amount: selectedTramite.priceCop,
+        formData,
+      });
+      setTransactionId(newTransactionId);
+      return newTransactionId;
+    } catch (error) {
+      console.error('Failed to create transaction:', error);
+      toast({
+        title: 'Error de Sistema',
+        description:
+          'No pudimos iniciar el proceso de pago. Por favor, intenta de nuevo.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
     addMessage(
       'lia',
       <div className="flex items-center gap-2">
@@ -363,10 +394,31 @@ export default function TramiteFacil() {
     setStep('processing-document');
     setIsLiaTyping(true);
 
+    // This is where a real webhook would have already marked the transaction as paid.
+    // For simulation, we'll manually call a "webhook".
+    if (transactionId) {
+      // This simulates the webhook call
+      await fetch('/api/webhooks/wompi', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          data: {
+            transaction: {
+              transactionId: transactionId,
+              wompiId: `wompi_${Date.now()}`,
+            },
+          },
+        }),
+      });
+    }
+
     setTimeout(() => {
       addMessage('lia', <DocumentGenerationProgress />);
       // Simulate document generation
-      setTimeout(() => {
+      setTimeout(async () => {
+        if (transactionId) {
+          await markTransactionAsDelivered(transactionId);
+        }
         setStep('document-ready');
         setIsLiaTyping(false);
         addMessage('lia', <SuccessCelebration onReset={resetState} />);
@@ -445,6 +497,7 @@ export default function TramiteFacil() {
                   <Payment
                     tramiteName={selectedTramite.name}
                     price={selectedTramite.priceCop}
+                    onPaymentInitiation={handlePaymentInitiation}
                     onPaymentSuccess={handlePaymentSuccess}
                   />
                 }

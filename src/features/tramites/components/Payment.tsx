@@ -9,19 +9,30 @@ import {Separator} from '@/components/ui/separator';
 type PaymentProps = {
   price: number;
   tramiteName: string;
+  onPaymentInitiation: () => Promise<string | null>;
   onPaymentSuccess: () => void;
 };
 
 export default function Payment({
   price,
   tramiteName,
+  onPaymentInitiation,
   onPaymentSuccess,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     setIsProcessing(true);
-    // Simulate API call to payment gateway
+    
+    // 1. Create a transaction document in Firestore
+    const transactionId = await onPaymentInitiation();
+    if (!transactionId) {
+        setIsProcessing(false);
+        // Toast with error is shown by the parent component
+        return;
+    }
+
+    // 2. Simulate API call to payment gateway
     setTimeout(() => {
       onPaymentSuccess();
       setIsProcessing(false);

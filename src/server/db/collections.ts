@@ -1,4 +1,13 @@
+'use server';
 import {z} from 'zod';
+import {firestore} from '@/server/lib/firebase';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  updateDoc,
+} from 'firebase/firestore';
 
 // Note: Using a lightweight Zod-based schema. In a larger app,
 // you might use a more robust solution like zod-to-json-schema.
@@ -8,61 +17,95 @@ import {z} from 'zod';
  */
 const BaseDocSchema = z.object({
   id: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.any().optional(),
+  updatedAt: z.any().optional(),
 });
 
 /**
- * User document schema.
- * Represents a user in the application.
+ * Transaction document schema.
+ * Represents a specific transaction for a trámite order.
  */
-export const UserDocSchema = BaseDocSchema.extend({
-  email: z.string().email().optional(),
-  displayName: z.string().optional(),
-  // other user fields...
-});
-export type UserDoc = z.infer<typeof UserDocSchema>;
-
-/**
- * Order document schema.
- * Represents a specific trámite order placed by a user.
- */
-export const OrderDocSchema = BaseDocSchema.extend({
-  userId: z.string(),
+export const TransactionDocSchema = BaseDocSchema.extend({
   tramiteId: z.string(),
-  status: z.enum(['pending', 'approved', 'declined', 'error', 'completed']),
+  tramiteName: z.string(),
   amount: z.number().positive(),
-  currency: z.string().length(3),
-  paymentProvider: z.enum(['wompi']),
-  transactionId: z.string().optional(),
-  reconciledAt: z.date().optional().nullable(),
+  currency: z.string().default('COP'),
+  status: z.enum(['pending', 'paid', 'failed', 'delivered']),
   formData: z.record(z.string(), z.any()),
+  wompiId: z.string().optional(),
+  paidAt: z.any().optional(),
+  deliveredAt: z.any().optional(),
 });
-export type OrderDoc = z.infer<typeof OrderDocSchema>;
-
-/**
- * Tramite document schema.
- * Represents an available trámite that can be purchased.
- * Could be seeded from a config file or managed via an admin panel.
- */
-export const TramiteDocSchema = BaseDocSchema.extend({
-  name: z.string(),
-  description: z.string(),
-  priceCop: z.number().positive(),
-  // ... other trámite-specific fields
-});
-export type TramiteDoc = z.infer<typeof TramiteDocSchema>;
+export type TransactionDoc = z.infer<typeof TransactionDocSchema>;
 
 /**
  * Path builders for Firestore collections.
  * Ensures type-safe and consistent path creation.
  */
 export const collections = {
-  users: () => 'users',
-  user: (id: string) => `users/${id}`,
-  orders: (userId: string) => `users/${userId}/orders`,
-  order: (userId: string, orderId: string) =>
-    `users/${userId}/orders/${orderId}`,
-  tramites: () => 'tramites',
-  tramite: (id: string) => `tramites/${id}`,
+  transactions: () => 'transactions',
+  transaction: (id: string) => `transactions/${id}`,
 };
+
+/**
+ * Creates a new transaction document in Firestore.
+ * @param data The initial data for the transaction.
+ * @returns The ID of the newly created document.
+ */
+export async function createTransaction(
+  data: Pick<
+    TransactionDoc,
+    'tramiteId' | 'tramiteName' | 'amount' | 'formData'
+  >
+): Promise<string> {
+  const transactionsCollection = collection(
+    firestore,
+    collections.transactions()
+  );
+  const newTransaction: Omit<TransactionDoc, 'id'> = {
+    ...data,
+    status: 'pending',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(transactionsCollection, newTransaction);
+  return docRef.id;
+}
+
+/**
+ * Updates a transaction document upon successful payment.
+ * @param transactionId The ID of the transaction to update.
+ * @param wompiId The transaction ID from Wompi.
+ */
+export async function markTransactionAsPaid(
+  transactionId: string,
+  wompiId: string
+) {
+  const transactionRef = doc(
+    firestore,
+    collections.transaction(transactionId)
+  );
+  await updateDoc(transactionRef, {
+    status: 'paid',
+    wompiId,
+    paidAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Updates a transaction document upon document delivery.
+ * @param transactionId The ID of the transaction to update.
+ */
+export async function markTransactionAsDelivered(transactionId: string) {
+  const transactionRef = doc(
+    firestore,
+    collections.transaction(transactionId)
+  );
+  await updateDoc(transactionRef, {
+    status: 'delivered',
+    deliveredAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
