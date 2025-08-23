@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bot, FileText, Loader2, Send, Sparkles, User, RefreshCcw, ArrowLeft } from 'lucide-react';
+import { Bot, FileText, Loader2, Send, Sparkles, User, RefreshCcw, ArrowLeft, CheckCircle2, Shield, FileCheck2 } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import TramiteSelector from './TramiteSelector';
 import Payment from './Payment';
 import DocumentDownloader from './DocumentDownloader';
 import ProgressIndicator from './ProgressIndicator';
+import { Progress } from '@/components/ui/progress';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -22,7 +23,7 @@ type Message = {
 };
 
 type Step = 'selecting-tramite' | 'collecting-info' | 'payment' | 'processing-document' | 'document-ready' | 'error';
-const stepsList: (Step | 'processing-document' | 'error')[] = ['selecting-tramite', 'collecting-info', 'payment', 'document-ready'];
+const stepsList: string[] = ['Selecciona tu trámite', 'Ingresa tu información', 'Paga seguro', 'Documento listo'];
 
 const initialState = {
   messages: [],
@@ -32,6 +33,52 @@ const initialState = {
   currentField: 0,
   isLiaTyping: false,
 };
+
+function DocumentGenerationProgress() {
+    const [progress, setProgress] = useState(10);
+    const [progressText, setProgressText] = useState("Preparando...");
+    const [showSlowMessage, setShowSlowMessage] = useState(false);
+  
+    useEffect(() => {
+      const timer1 = setTimeout(() => {
+        setProgress(45);
+        setProgressText("Consultando sistemas...");
+      }, 1500);
+  
+      const timer2 = setTimeout(() => {
+        setProgress(80);
+        setProgressText("Generando PDF...");
+      }, 3000);
+
+      const slowTimer = setTimeout(() => {
+        setShowSlowMessage(true);
+      }, 5000);
+  
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(slowTimer);
+      };
+    }, []);
+  
+    return (
+        <div className="space-y-3 p-2">
+            <div className="flex items-center gap-2">
+                <Loader2 className="animate-spin" />
+                <span>Estamos generando tu documento...</span>
+            </div>
+            <div className="space-y-2">
+                <Progress value={progress} className="w-full h-2" />
+                <p className="text-xs text-center text-muted-foreground">{progressText} ({progress}%)</p>
+            </div>
+            {showSlowMessage && (
+                <p className="text-xs text-center text-amber-600 dark:text-amber-400 p-2 bg-amber-50 dark:bg-amber-950/50 rounded-md">
+                   Esto suele tardar menos de 30s. Puedes dejar esta pantalla abierta.
+                </p>
+            )}
+        </div>
+    );
+}
 
 export default function TramiteFacil() {
   const [messages, setMessages] = useState<Message[]>(initialState.messages);
@@ -48,6 +95,16 @@ export default function TramiteFacil() {
   const addMessage = useCallback((sender: 'user' | 'lia', content: React.ReactNode) => {
     setMessages(prev => [...prev, { sender, content, id: Date.now() }]);
   }, []);
+  
+  const handleTramiteSelect = useCallback((tramite: Tramite) => {
+    addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
+    setSelectedTramite(tramite);
+    
+    setTimeout(() => {
+      addMessage('lia', <> <p>¡Excelente elección!</p> <p>Para el <strong>{tramite.name}</strong>, necesitaré algunos datos.</p> </>);
+      setStep('collecting-info');
+    }, 500);
+  }, [addMessage]);
 
   const resetState = useCallback(() => {
     setMessages(initialState.messages);
@@ -58,19 +115,17 @@ export default function TramiteFacil() {
     setIsLiaTyping(initialState.isLiaTyping);
     setUserInput('');
     
-    // Add initial welcome message after a short delay
     setTimeout(() => {
       addMessage(
         'lia',
         <>
-          <p className="mb-2">¡Hola! 👋 Soy LIA, tu asistente virtual para trámites en Colombia.</p>
-          <p className="mb-4">Te ayudaré a sacar tus documentos en menos de 3 minutos. ¿Listo?</p>
-          <p className="font-medium">Por favor, elige el trámite que quieres realizar:</p>
-          <TramiteSelector onSelect={handleTramiteSelect} />
+          <p className="mb-2">Hola 👋 Soy LIA. Te ayudo a obtener tus documentos oficiales en minutos.</p>
+          <p className="text-sm text-muted-foreground">1. Elige tu trámite. 2. Ingresa datos. 3. Paga seguro. 4. Descarga el documento.</p>
         </>
       );
+      addMessage('lia', <TramiteSelector onSelect={handleTramiteSelect} />);
     }, 100);
-  }, [addMessage]);
+  }, [addMessage, handleTramiteSelect]);
   
   useEffect(() => {
     resetState();
@@ -91,7 +146,7 @@ export default function TramiteFacil() {
         const field = selectedTramite.dataRequirements[currentField];
         addMessage('lia', `Por favor, ingresa tu ${field.label.toLowerCase()}:`);
       } else {
-        addMessage('lia', `¡Perfecto! Hemos reunido toda la información. El costo del trámite es de ${selectedTramite.priceCop.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}.`);
+        addMessage('lia', <div className="flex items-center gap-2"><CheckCircle2 className="text-green-500"/><span>¡Perfecto! Hemos reunido toda la información.</span></div>);
         setStep('payment');
       }
       setIsLiaTyping(false);
@@ -99,29 +154,24 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage, step]);
 
   useEffect(() => {
-    if (step === 'collecting-info' && !isLiaTyping && messages.length > 0 && messages[messages.length - 1]?.sender === 'user') {
+    if (step === 'collecting-info' && !isLiaTyping && messages[messages.length - 1]?.sender !== 'lia' && selectedTramite) {
         askNextQuestion();
     }
-  }, [step, currentField, isLiaTyping, askNextQuestion, messages]);
+  }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite]);
 
-
-  const handleTramiteSelect = useCallback((tramite: Tramite) => {
-    addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
-    setSelectedTramite(tramite);
-    
-    setTimeout(() => {
-      addMessage('lia', `¡Excelente elección! Para el ${tramite.name}, necesitaré algunos datos.`);
-      setStep('collecting-info');
-      setCurrentField(0);
-       setTimeout(() => askNextQuestion(), 500);
-    }, 1000);
-  }, [addMessage, askNextQuestion]);
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!userInput.trim() || isLiaTyping || step !== 'collecting-info' || !selectedTramite) return;
     
-    if (currentField >= selectedTramite.dataRequirements.length) return;
+    if (currentField >= selectedTramite.dataRequirements.length) {
+        toast({
+            title: "Información completa",
+            description: "Ya has proporcionado todos los datos necesarios.",
+            variant: "default",
+        });
+        return;
+    }
 
     addMessage('user', userInput);
     
@@ -143,31 +193,38 @@ export default function TramiteFacil() {
     setIsLiaTyping(true);
 
     setTimeout(() => {
-      setIsLiaTyping(false);
-      addMessage('lia', 
-        <div className="flex items-center gap-2">
-            <Loader2 className="animate-spin" />
-            <span>Estamos generando tu documento. Esto puede tardar un momento...</span>
-        </div>
-      );
-
+      addMessage('lia', <DocumentGenerationProgress />);
+      // Simulate document generation
       setTimeout(() => {
         setStep('document-ready');
+        setIsLiaTyping(false);
         addMessage('lia', 
           <div className="flex items-center gap-2">
-              <FileText />
-              <span>¡Tu documento está listo!</span>
+              <FileCheck2 className="text-green-500" />
+              <span>¡Tu documento está listo para descargar!</span>
           </div>
         );
-      }, 3000);
-    }, 1500);
+      }, 7000); // Total generation time
+    }, 500);
   };
   
-  const handleStepChange = (newStepIndex: number) => {
-    const currentStepIndex = stepsList.indexOf(step);
-    if (newStepIndex >= currentStepIndex) return;
+  const stepNameToEnum = (stepName: string): Step => {
+      const map: Record<string, Step> = {
+          'Selecciona tu trámite': 'selecting-tramite',
+          'Ingresa tu información': 'collecting-info',
+          'Paga seguro': 'payment',
+          'Documento listo': 'document-ready'
+      };
+      return map[stepName] || 'error';
+  }
 
-    const newStep = stepsList[newStepIndex] as Step;
+  const handleStepChange = (newStepIndex: number) => {
+    const currentStepName = stepsList[currentStepIndex];
+    const newStepName = stepsList[newStepIndex];
+    const newStep = stepNameToEnum(newStepName);
+    
+    if (newStepIndex >= stepsList.findIndex(s => stepNameToEnum(s) === step)) return;
+    
     setStep(newStep);
 
     if (newStep === 'selecting-tramite') {
@@ -182,24 +239,35 @@ export default function TramiteFacil() {
       setMessages(messagesToShow);
       setTimeout(() => {
         addMessage('lia', 'Retomando desde aquí. ¿Qué deseas hacer?');
-         if (newCurrentField < selectedTramite!.dataRequirements.length) {
-          askNextQuestion();
-        }
       }, 200);
     }
   };
 
   const goBack = () => {
-    const currentStepIndex = stepsList.indexOf(step);
+    const currentStepEnum = step;
+    const currentStepIndex = stepsList.findIndex(s => stepNameToEnum(s) === currentStepEnum);
     if (currentStepIndex > 0) {
       handleStepChange(currentStepIndex - 1);
+    } else if (step === 'collecting-info') {
+        handleStepChange(0);
     }
   };
-
-  const currentStepIndex = stepsList.indexOf(step);
+  
+  const getStepIndex = (step: Step): number => {
+    const mapping: Record<Step, number> = {
+      'selecting-tramite': 0,
+      'collecting-info': 1,
+      'payment': 2,
+      'processing-document': 2, // Belongs to payment step visually
+      'document-ready': 3,
+      'error': -1,
+    };
+    return mapping[step];
+  }
+  const currentStepIndex = getStepIndex(step);
 
   return (
-    <Card className="w-full max-w-2xl h-[90vh] max-h-[800px] flex flex-col shadow-2xl rounded-2xl border-2 border-primary/20">
+    <Card className="w-full max-w-2xl h-[90vh] max-h-[800px] flex flex-col shadow-2xl rounded-2xl border-2 border-primary/20 bg-card">
       <CardHeader className="flex flex-row items-center justify-between border-b-2 border-primary/20">
         <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/20 rounded-full">
@@ -216,23 +284,24 @@ export default function TramiteFacil() {
         </Button>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-        <div className="p-4 border-b">
+      <div className="sticky top-0 z-20 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 border-b p-4">
           <ProgressIndicator 
-            steps={stepsList.map(s => s.replace('-', ' '))} 
+            steps={stepsList} 
             currentStep={currentStepIndex}
             onStepClick={handleStepChange}
           />
-          {selectedTramite && <p className="text-center text-sm text-muted-foreground mt-2">Trámite: <strong>{selectedTramite.name}</strong></p>}
-        </div>
-        <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
-          <div className="space-y-6">
+          {selectedTramite && <p className="text-center text-xs text-muted-foreground mt-2">Trámite: <strong>{selectedTramite.name}</strong></p>}
+      </div>
+
+      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+        <ScrollArea className="flex-1" ref={scrollAreaRef}>
+          <div className="space-y-6 p-6">
             {messages.map((msg) => (
               <ChatBubble key={msg.id} sender={msg.sender} content={msg.content} />
             ))}
-            {isLiaTyping && <ChatBubble sender="lia" content={<Loader2 className="animate-spin" />} />}
+            {isLiaTyping && step !== 'processing-document' && <ChatBubble sender="lia" content={<Loader2 className="animate-spin" />} />}
              {step === 'payment' && selectedTramite && (
-              <ChatBubble sender="lia" content={<Payment price={selectedTramite.priceCop} onPaymentSuccess={handlePaymentSuccess} />} />
+              <ChatBubble sender="lia" content={<Payment tramiteName={selectedTramite.name} price={selectedTramite.priceCop} onPaymentSuccess={handlePaymentSuccess} />} />
             )}
             {step === 'document-ready' && selectedTramite && (
               <ChatBubble sender="lia" content={<DocumentDownloader tramiteName={selectedTramite.name} />} />
@@ -241,7 +310,7 @@ export default function TramiteFacil() {
         </ScrollArea>
       </CardContent>
 
-      <CardFooter className="p-4 border-t-2 border-primary/20">
+      <div className="sticky bottom-0 z-20 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 border-t p-3">
         <div className="flex w-full items-center space-x-2">
             {step !== 'selecting-tramite' && (
               <Button variant="outline" size="icon" onClick={goBack} disabled={isLiaTyping}>
@@ -263,7 +332,7 @@ export default function TramiteFacil() {
               </Button>
             </form>
         </div>
-      </CardFooter>
+      </div>
       <div className="text-center text-xs text-muted-foreground p-2 bg-secondary rounded-b-2xl">
         TrámiteYA no es una entidad gubernamental; automatizamos el acceso a servicios públicos y te guiamos paso a paso.
       </div>
