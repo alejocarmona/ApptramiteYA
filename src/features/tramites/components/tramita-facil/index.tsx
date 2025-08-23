@@ -3,21 +3,18 @@
 import React, {useState, useRef, useEffect, useCallback} from 'react';
 import {
   Bot,
-  FileText,
   Loader2,
   Send,
   Sparkles,
-  User,
-  RefreshCcw,
   ArrowLeft,
   CheckCircle2,
-  Shield,
   FileCheck2,
+  ChevronDown,
+  Star
 } from 'lucide-react';
 import {
   Card,
   CardContent,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -33,6 +30,7 @@ import Payment from '../Payment';
 import DocumentDownloader from '../DocumentDownloader';
 import ProgressIndicator from '../ProgressIndicator';
 import {Progress} from '@/components/ui/progress';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -92,9 +90,9 @@ function DocumentGenerationProgress() {
 
   return (
     <div className="space-y-3 p-2">
-      <div className="flex items-center gap-2">
-        <Loader2 className="animate-spin" />
-        <span>Estamos generando tu documento...</span>
+      <div className="flex items-center justify-center gap-2">
+        <Loader2 className="animate-spin text-primary" />
+        <span className="font-semibold text-primary-foreground">Estamos generando tu documento...</span>
       </div>
       <div className="space-y-2">
         <Progress value={progress} className="h-2 w-full" />
@@ -110,6 +108,68 @@ function DocumentGenerationProgress() {
     </div>
   );
 }
+
+function WelcomeHero() {
+  const scrollToTramites = () => {
+    document.getElementById('tramite-selector')?.scrollIntoView({ behavior: 'smooth' });
+  };
+  return (
+    <div className="text-center p-4 rounded-lg bg-card">
+      <Avatar className="mx-auto h-16 w-16 mb-4 border-4 border-primary/20 bg-primary/10">
+        <AvatarFallback className='bg-transparent'>
+          <Bot className="h-8 w-8 text-primary"/>
+        </AvatarFallback>
+      </Avatar>
+      <h2 className="text-2xl font-bold text-foreground">Obtén tus documentos oficiales en minutos</h2>
+      <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+        Soy LIA, tu asistente virtual. Te guiaré paso a paso para que completes tus trámites sin complicaciones.
+      </p>
+      <div className="text-sm mt-4 text-left inline-block bg-muted/40 p-3 rounded-md">
+        <p>1. Elige tu trámite.</p>
+        <p>2. Ingresa tus datos.</p>
+        <p>3. Paga de forma segura.</p>
+        <p>4. Descarga tu documento.</p>
+      </div>
+      <div className="mt-6">
+        <Button onClick={scrollToTramites} size="lg">
+          Empezar ahora <ChevronDown className="ml-2 h-4 w-4"/>
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function SuccessCelebration() {
+  return (
+    <div className="relative overflow-hidden rounded-lg p-4 text-center">
+       {Array.from({ length: 15 }).map((_, i) => (
+        <div
+          key={i}
+          className="confetti-piece"
+          style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            transform: `rotate(${Math.random() * 360}deg)`,
+            backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`
+          }}
+        />
+      ))}
+      <div className="flex flex-col items-center gap-2">
+          <FileCheck2 className="text-green-500 h-12 w-12" />
+          <span className="text-xl font-semibold">¡Tu documento está listo para descargar!</span>
+          <p className="text-sm text-muted-foreground">¿Te fue útil? ¡Ayúdanos a mejorar!</p>
+          <div className="flex gap-1 text-yellow-400 mt-2">
+            {[...Array(5)].map((_, i) => (
+              <button key={i} className="transition-transform hover:scale-125">
+                 <Star className="w-6 h-6" fill="currentColor" />
+              </button>
+            ))}
+          </div>
+      </div>
+    </div>
+  )
+}
+
 
 export default function TramiteFacil() {
   const [messages, setMessages] = useState<Message[]>(initialState.messages);
@@ -147,11 +207,8 @@ export default function TramiteFacil() {
         addMessage(
           'lia',
           <>
-            {' '}
-            <p>¡Excelente elección!</p>{' '}
-            <p>
-              Para el <strong>{tramite.name}</strong>, necesitaré algunos datos.
-            </p>{' '}
+            <p>¡Excelente elección!</p>
+            <p>Para el <strong>{tramite.name}</strong>, necesitaré algunos datos.</p>
           </>
         );
         setStep('collecting-info');
@@ -170,20 +227,8 @@ export default function TramiteFacil() {
     setUserInput('');
 
     setTimeout(() => {
-      addMessage(
-        'lia',
-        <>
-          <p className="mb-2">
-            Hola 👋 Soy LIA. Te ayudo a obtener tus documentos oficiales en
-            minutos.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            1. Elige tu trámite. 2. Ingresa datos. 3. Paga seguro. 4. Descarga
-            el documento.
-          </p>
-        </>
-      );
-      addMessage('lia', <TramiteSelector onSelect={handleTramiteSelect} />);
+      addMessage('lia', <WelcomeHero />);
+      addMessage('lia', <div id="tramite-selector"><TramiteSelector onSelect={handleTramiteSelect} /></div>);
     }, 100);
   }, [addMessage, handleTramiteSelect]);
 
@@ -226,12 +271,23 @@ export default function TramiteFacil() {
     if (
       step === 'collecting-info' &&
       !isLiaTyping &&
+      messages.length > 0 &&
       messages[messages.length - 1]?.sender === 'user' &&
       selectedTramite
     ) {
-      askNextQuestion();
+      const isInitialQuestion = messages.filter(m => m.sender === 'lia').length <= 2
+      if(!isInitialQuestion) {
+        askNextQuestion();
+      }
     }
   }, [step, isLiaTyping, askNextQuestion, messages, selectedTramite]);
+
+  useEffect(() => {
+    if (step === 'collecting-info' && selectedTramite && messages.filter(m => m.sender === 'user').length === 1) {
+        askNextQuestion();
+    }
+  }, [step, selectedTramite, messages, askNextQuestion]);
+
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -265,7 +321,7 @@ export default function TramiteFacil() {
     addMessage(
       'lia',
       <div className="flex items-center gap-2">
-        <Sparkles className="text-accent-foreground" />
+        <Sparkles className="text-accent" />
         <span>Pago aprobado. ¡Gracias!</span>
       </div>
     );
@@ -278,13 +334,7 @@ export default function TramiteFacil() {
       setTimeout(() => {
         setStep('document-ready');
         setIsLiaTyping(false);
-        addMessage(
-          'lia',
-          <div className="flex items-center gap-2">
-            <FileCheck2 className="text-green-500" />
-            <span>¡Tu documento está listo para descargar!</span>
-          </div>
-        );
+        addMessage('lia', <SuccessCelebration />);
       }, 7000); // Total generation time
     }, 500);
   };
@@ -300,7 +350,6 @@ export default function TramiteFacil() {
   };
 
   const handleStepChange = (newStepIndex: number) => {
-    const currentStepName = stepsList[currentStepIndex];
     const newStepName = stepsList[newStepIndex];
     const newStep = stepNameToEnum(newStepName);
 
@@ -356,26 +405,22 @@ export default function TramiteFacil() {
   const currentStepIndex = getStepIndex(step);
 
   return (
-    <Card className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-2 border-primary/20 bg-card shadow-2xl">
-      <CardHeader className="flex flex-row items-center justify-between border-b-2 border-primary/20">
+    <Card className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl">
+      <CardHeader className="flex flex-row items-center justify-between border-b">
         <div className="flex items-center gap-3">
-          <div className="rounded-full bg-primary/20 p-2">
-            <Bot className="h-8 w-8 text-primary-foreground" />
+          <div className="rounded-full bg-primary/10 p-2">
+            <Bot className="h-8 w-8 text-primary" />
           </div>
           <div>
-            <CardTitle className="font-headline text-2xl text-primary-foreground/90">
+            <CardTitle className="font-headline text-2xl text-foreground">
               Trámite Fácil
             </CardTitle>
             <p className="text-sm text-muted-foreground">Asistente LIA</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={resetState}>
-          <RefreshCcw className="w-5 h-5" />
-          <span className="sr-only">Reiniciar conversación</span>
-        </Button>
       </CardHeader>
 
-      <div className="supports-[backdrop-filter]:bg-card/60 sticky top-0 z-20 border-b bg-card/80 p-4 backdrop-blur">
+      <div className="sticky top-0 z-20 border-b bg-card/80 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <ProgressIndicator
           steps={stepsList}
           currentStep={currentStepIndex}
@@ -389,7 +434,7 @@ export default function TramiteFacil() {
       </div>
 
       <CardContent className="flex flex-1 flex-col overflow-hidden p-0">
-        <ScrollArea className="flex-1" ref={scrollAreaRef}>
+        <ScrollArea className="flex-1" ref={scrollAreaRef} aria-live="polite">
           <div className="space-y-6 p-6">
             {messages.map((msg) => (
               <ChatBubble
@@ -423,51 +468,44 @@ export default function TramiteFacil() {
         </ScrollArea>
       </CardContent>
 
-      <div className="supports-[backdrop-filter]:bg-card/60 sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur">
-        <div className="flex w-full items-center space-x-2">
-          {step !== 'selecting-tramite' && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={goBack}
-              disabled={isLiaTyping}
+      {step === 'collecting-info' && (
+        <div className="sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+          <div className="flex w-full items-center space-x-2">
+            {step !== 'selecting-tramite' && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goBack}
+                disabled={isLiaTyping}
+                aria-label="Atrás"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
+            <form
+              onSubmit={handleUserInput}
+              className="flex flex-1 items-center space-x-2"
             >
-              <ArrowLeft className="h-5 w-5" />
-              <span className="sr-only">Atrás</span>
-            </Button>
-          )}
-          <form
-            onSubmit={handleUserInput}
-            className="flex flex-1 items-center space-x-2"
-          >
-            <Input
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              placeholder={
-                step === 'collecting-info'
-                  ? 'Escribe tu respuesta aquí...'
-                  : 'La conversación ha finalizado.'
-              }
-              disabled={step !== 'collecting-info' || isLiaTyping}
-              className="flex-1 text-base"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={
-                step !== 'collecting-info' || isLiaTyping || !userInput.trim()
-              }
-            >
-              <Send className="h-5 w-5" />
-              <span className="sr-only">Enviar</span>
-            </Button>
-          </form>
+              <Input
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                placeholder={'Escribe tu respuesta aquí...'}
+                disabled={isLiaTyping}
+                className="flex-1 text-base"
+                aria-label="Entrada de usuario"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                disabled={isLiaTyping || !userInput.trim()}
+                aria-label="Enviar mensaje"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </form>
+          </div>
         </div>
-      </div>
-      <div className="rounded-b-2xl bg-secondary p-2 text-center text-xs text-muted-foreground">
-        TrámiteYA no es una entidad gubernamental; automatizamos el acceso a
-        servicios públicos y te guiamos paso a paso.
-      </div>
+      )}
     </Card>
   );
 }

@@ -13,6 +13,7 @@ export type Tramite = {
   description: string;
   priceCop: number;
   flowType: 'API' | 'SCRAPE' | 'GUIDE';
+  benefit: string;
   dataRequirements: Field[];
 };
 
@@ -21,9 +22,10 @@ export const TRAMITES: Tramite[] = [
     id: 'antecedentes-judiciales',
     name: 'Certificado de Antecedentes Judiciales',
     description:
-      'Consulta y descarga el certificado de antecedentes judiciales de la Policía Nacional.',
+      'Consulta y descarga el certificado de antecedentes de la Policía Nacional.',
     priceCop: 15000,
     flowType: 'GUIDE',
+    benefit: 'Válido para cualquier trámite legal',
     dataRequirements: [
       {
         id: 'tipoDocumento',
@@ -46,6 +48,7 @@ export const TRAMITES: Tramite[] = [
       'Obtén el certificado que acredita tu afiliación al sistema de salud.',
     priceCop: 12500,
     flowType: 'GUIDE',
+    benefit: 'Recíbelo en tu correo en minutos',
     dataRequirements: [
       {
         id: 'tipoDocumento',
@@ -68,6 +71,7 @@ export const TRAMITES: Tramite[] = [
       'Certificado de tu fondo de pensiones para trámites laborales y personales.',
     priceCop: 12500,
     flowType: 'GUIDE',
+    benefit: 'Aceptado por todas las entidades',
     dataRequirements: [
       {
         id: 'tipoDocumento',
@@ -89,6 +93,7 @@ export const TRAMITES: Tramite[] = [
     description: 'Gestiona tu Registro Único Tributario ante la DIAN.',
     priceCop: 25000,
     flowType: 'GUIDE',
+    benefit: 'Actualizado y listo para imprimir',
     dataRequirements: [
       {
         id: 'tipoDocumento',
@@ -113,9 +118,10 @@ export const TRAMITES: Tramite[] = [
     id: 'camara-comercio',
     name: 'Certificado de Cámara de Comercio (RUES)',
     description:
-      'Consulta y descarga certificados de existencia y representación legal de empresas.',
+      'Certificados de existencia y representación legal de empresas.',
     priceCop: 35000,
     flowType: 'GUIDE',
+    benefit: 'Información oficial del RUES',
     dataRequirements: [
       {
         id: 'nit',
@@ -131,6 +137,7 @@ export const TRAMITES: Tramite[] = [
     description: 'Documento que informa el historial jurídico de un inmueble.',
     priceCop: 45000,
     flowType: 'GUIDE',
+    benefit: 'Directo de la Supernotariado',
     dataRequirements: [
       {
         id: 'matriculaInmobiliaria',
@@ -152,6 +159,7 @@ export const TRAMITES: Tramite[] = [
     description: 'Certificado sobre inhabilidades y sanciones disciplinarias.',
     priceCop: 15000,
     flowType: 'GUIDE',
+    benefit: 'Consulta nacional al instante',
     dataRequirements: [
       {
         id: 'tipoDocumento',
@@ -174,6 +182,7 @@ export const TRAMITES: Tramite[] = [
       'Certificado de responsabilidad fiscal emitido por la Contraloría.',
     priceCop: 15000,
     flowType: 'GUIDE',
+    benefit: 'Certificado oficial para contratos',
     dataRequirements: [
       {
         id: 'tipoDocumento',
