@@ -22,15 +22,16 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {TRAMITES, Tramite} from '@/features/tramites/lib/tramites';
-import {useLiaToFillInFields} from '@/server/ai/flows/use-lia-to-fill-in-fields';
 import {useToast} from '@/hooks/use-toast';
 import ChatBubble from '../ChatBubble';
 import TramiteSelector from '../TramiteSelector';
 import Payment from '../Payment';
 import DocumentDownloader from '../DocumentDownloader';
-import ProgressIndicator from '../ProgressIndicator';
+import FlowStepper from './FlowStepper';
 import {Progress} from '@/components/ui/progress';
 import {Avatar, AvatarFallback} from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+import { useLiaToFillInFields } from '@/server/ai/flows/use-lia-to-fill-in-fields';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -92,7 +93,7 @@ function DocumentGenerationProgress() {
     <div className="space-y-3 p-2">
       <div className="flex items-center justify-center gap-2">
         <Loader2 className="animate-spin text-primary" />
-        <span className="font-semibold text-primary-foreground">
+        <span className="font-semibold text-foreground">
           Estamos generando tu documento...
         </span>
       </div>
@@ -285,11 +286,10 @@ export default function TramiteFacil() {
   useEffect(() => {
     if (step === 'collecting-info' && !isLiaTyping && selectedTramite) {
       const lastMessage = messages[messages.length - 1];
-      const isLiaLastSender = lastMessage?.sender === 'lia';
       // Ask first question right after tramite selection
       if (
         messages.filter((m) => m.sender === 'user').length === 1 &&
-        messages.filter((m) => m.sender === 'lia').length === 2 &&
+        lastMessage?.sender === 'lia' &&
         currentField === 0
       ) {
         askNextQuestion();
@@ -333,7 +333,7 @@ export default function TramiteFacil() {
     addMessage(
       'lia',
       <div className="flex items-center gap-2">
-        <Sparkles className="text-accent" />
+        <Sparkles className="text-green-500" />
         <span>Pago aprobado. ¡Gracias!</span>
       </div>
     );
@@ -433,7 +433,7 @@ export default function TramiteFacil() {
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <ProgressIndicator
+        <FlowStepper
           steps={stepsList}
           currentStep={currentStepIndex}
           onStepClick={handleStepChange}
@@ -485,44 +485,43 @@ export default function TramiteFacil() {
         </ScrollArea>
       </CardContent>
 
-      {step === 'collecting-info' && (
-        <div className="sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-          <div className="flex w-full items-center space-x-2">
-            {step !== 'selecting-tramite' && (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={goBack}
-                disabled={isLiaTyping}
-                aria-label="Atrás"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            )}
-            <form
-              onSubmit={handleUserInput}
-              className="flex flex-1 items-center space-x-2"
+      <div className={cn(
+          "sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60",
+          step !== 'collecting-info' && 'hidden'
+      )}>
+        <div className="flex w-full items-center space-x-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goBack}
+              disabled={isLiaTyping}
+              aria-label="Atrás"
             >
-              <Input
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                placeholder={'Escribe tu respuesta aquí...'}
-                disabled={isLiaTyping}
-                className="flex-1 text-base"
-                aria-label="Entrada de usuario"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                disabled={isLiaTyping || !userInput.trim()}
-                aria-label="Enviar mensaje"
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-            </form>
-          </div>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          <form
+            onSubmit={handleUserInput}
+            className="flex flex-1 items-center space-x-2"
+          >
+            <Input
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              placeholder={'Escribe tu respuesta aquí...'}
+              disabled={isLiaTyping}
+              className="flex-1 text-base"
+              aria-label="Entrada de usuario"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={isLiaTyping || !userInput.trim()}
+              aria-label="Enviar mensaje"
+            >
+              <Send className="h-5 w-5" />
+            </Button>
+          </form>
         </div>
-      )}
+      </div>
     </Card>
   );
 }

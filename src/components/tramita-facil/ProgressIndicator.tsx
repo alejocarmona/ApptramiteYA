@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from "react";
@@ -29,7 +30,7 @@ export default function ProgressIndicator({ steps, currentStep, onStepClick }: P
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300",
                   isActive ? "bg-primary border-primary text-primary-foreground" : "",
-                  isCompleted ? "bg-accent border-accent text-accent-foreground" : "",
+                  isCompleted ? "bg-green-600 border-green-600 text-white" : "",
                   !isActive && !isCompleted ? "bg-secondary border-border" : "",
                   isClickable && "hover:border-primary hover:bg-primary/20"
                 )}
@@ -47,7 +48,7 @@ export default function ProgressIndicator({ steps, currentStep, onStepClick }: P
             {index < steps.length - 1 && (
               <div className={cn(
                 "flex-1 h-1 mx-2 transition-colors duration-300",
-                isCompleted ? "bg-accent" : "bg-border"
+                isCompleted ? "bg-green-600" : "bg-border"
               )}></div>
             )}
           </React.Fragment>
