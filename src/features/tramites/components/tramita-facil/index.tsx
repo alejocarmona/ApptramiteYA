@@ -28,11 +28,10 @@ import ChatBubble from '../ChatBubble';
 import TramiteSelector from '../TramiteSelector';
 import Payment from '../Payment';
 import DocumentDownloader from '../DocumentDownloader';
-import FlowStepper from './FlowStepper';
+import AdaptiveStepper from './AdaptiveStepper';
 import {Progress} from '@/components/ui/progress';
 import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { useLiaToFillInFields } from '@/server/ai/flows/use-lia-to-fill-in-fields';
 import { useKeyboardPadding } from '@/hooks/use-keyboard-padding';
 
 type Message = {
@@ -48,12 +47,6 @@ type Step =
   | 'processing-document'
   | 'document-ready'
   | 'error';
-const stepsList: string[] = [
-  'Selecciona tu trámite',
-  'Ingresa tu información',
-  'Paga seguro',
-  'Documento listo',
-];
 
 const initialState = {
   messages: [],
@@ -354,70 +347,17 @@ export default function TramiteFacil() {
     }, 500);
   };
 
-  const stepNameToEnum = (stepName: string): Step => {
-    const map: Record<string, Step> = {
-      'Selecciona tu trámite': 'selecting-tramite',
-      'Ingresa tu información': 'collecting-info',
-      'Paga seguro': 'payment',
-      'Documento listo': 'document-ready',
-    };
-    return map[stepName] || 'error';
-  };
-
-  const handleStepChange = (newStepIndex: number) => {
-    const newStepName = stepsList[newStepIndex];
-    const newStep = stepNameToEnum(newStepName);
-
-    if (newStepIndex >= stepsList.findIndex((s) => stepNameToEnum(s) === step))
-      return;
-
-    setStep(newStep);
-
-    if (newStep === 'selecting-tramite') {
-      resetState();
-    } else if (newStep === 'collecting-info') {
-      const lastUserMessageIndex = messages.map((m) => m.sender).lastIndexOf('user');
-      const messagesToShow = messages.slice(0, lastUserMessageIndex + 1);
-
-      const newCurrentField = selectedTramite
-        ? Math.min(
-            Object.keys(formData).length,
-            selectedTramite.dataRequirements.length
-          )
-        : 0;
-      setCurrentField(newCurrentField);
-
-      setMessages(messagesToShow);
-      setTimeout(() => {
-        addMessage('lia', 'Retomando desde aquí. ¿Qué deseas hacer?');
-      }, 200);
-    }
-  };
-
-  const goBack = () => {
-    const currentStepEnum = step;
-    const currentStepIndex = stepsList.findIndex(
-      (s) => stepNameToEnum(s) === currentStepEnum
-    );
-    if (currentStepIndex > 0) {
-      handleStepChange(currentStepIndex - 1);
-    } else if (step === 'collecting-info') {
-      handleStepChange(0);
-    }
-  };
-
-  const getStepIndex = (step: Step): number => {
-    const mapping: Record<Step, number> = {
-      'selecting-tramite': 0,
-      'collecting-info': 1,
-      payment: 2,
-      'processing-document': 2, // Belongs to payment step visually
-      'document-ready': 3,
-      error: -1,
+  const getStepIndex = (step: Step): 1 | 2 | 3 | 4 => {
+    const mapping: Record<Step, 1 | 2 | 3 | 4> = {
+      'selecting-tramite': 1,
+      'collecting-info': 2,
+      'payment': 3,
+      'processing-document': 3, 
+      'document-ready': 4,
+      'error': 1, // default to first step on error
     };
     return mapping[step];
   };
-  const currentStepIndex = getStepIndex(step);
 
   return (
     <Card 
@@ -439,11 +379,7 @@ export default function TramiteFacil() {
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <FlowStepper
-          steps={stepsList}
-          currentStep={currentStepIndex}
-          onStepClick={handleStepChange}
-        />
+        <AdaptiveStepper current={getStepIndex(step)} />
         {selectedTramite && (
           <p className="border-t border-border/50 py-1 text-center text-xs text-muted-foreground">
             Trámite: <strong>{selectedTramite.name}</strong>
@@ -503,7 +439,7 @@ export default function TramiteFacil() {
             <Button
               variant="outline"
               size="icon"
-              onClick={goBack}
+              onClick={() => setStep('selecting-tramite')}
               disabled={isLiaTyping}
               aria-label="Atrás"
               className='min-h-[44px] min-w-[44px]'
