@@ -13,9 +13,9 @@ import {
 } from 'lucide-react';
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
-import {getApp} from 'firebase/app';
-import {getFunctions, httpsCallable} from 'firebase/functions';
-import { useToast } from '@/hooks/use-toast';
+import {httpsCallable} from 'firebase/functions';
+import {useToast} from '@/hooks/use-toast';
+import { getFirebaseFunctions } from '@/lib/firebase';
 
 
 type PaymentProps = {
@@ -26,9 +26,6 @@ type PaymentProps = {
   onPaymentSuccess: () => void;
   onPaymentError: (message: string) => void;
 };
-
-// IMPORTANT: Replace with the region where your functions are deployed
-const FIREBASE_REGION = 'us-central1';
 
 export default function Payment({
   price,
@@ -49,7 +46,7 @@ export default function Payment({
     const totalInCents = Math.round((price + serviceFee + iva) * 100);
 
     try {
-      const functions = getFunctions(getApp(), FIREBASE_REGION);
+      const functions = getFirebaseFunctions();
       const createWompiTransaction = httpsCallable(functions, 'createWompiTransaction');
       
       const result: any = await createWompiTransaction({

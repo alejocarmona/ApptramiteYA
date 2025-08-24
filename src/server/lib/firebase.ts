@@ -1,20 +1,17 @@
-import {initializeApp, getApps, getApp} from 'firebase/app';
-import {getFirestore} from 'firebase/firestore';
-import { env } from '@/config/env';
+import {initializeApp, getApps, getApp, ServiceAccount, cert} from 'firebase-admin/app';
+import {getFirestore} from 'firebase-admin/firestore';
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+// This file is intended for SERVER-SIDE use only.
 
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const apps = getApps();
+
+const serviceAccount: ServiceAccount = {
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+}
+
+const app = !apps.length ? initializeApp({ credential: cert(serviceAccount) }) : getApp();
 const firestore = getFirestore(app);
 
 export {app, firestore};
