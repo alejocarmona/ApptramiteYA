@@ -83,3 +83,32 @@ firebase deploy --only functions
 ```
 
 The frontend application calls this function directly using the Firebase Functions SDK. The function's region must be specified correctly on the client-side in `src/lib/firebase.ts`.
+
+## Manual QA Smoke Test
+
+**Objective**: To confirm the end-to-end user flow works correctly using the mock payment system, without any dependency on the real Wompi service.
+
+### Test Cases
+
+#### Case 1: Successful Payment
+1. Start the application and select any `trámite`.
+2. Proceed through the data entry steps until you reach the payment summary (Step 3).
+3. Click the "Pagar" button.
+4. In the "Mock de Pago" modal that appears, click the "**Pago exitoso**" option.
+5. **Expected Result**: The modal closes, a "Pago aprobado" message appears in the chat, and the application automatically proceeds to the "Generando Documento" view (Step 4).
+
+#### Case 2: Insufficient Funds
+1. Follow steps 1-3 from Case 1.
+2. In the "Mock de Pago" modal, click the "**Saldo insuficiente**" option.
+3. **Expected Result**: A non-blocking alert or toast message appears indicating insufficient funds. The application remains on the payment summary screen (Step 3), and the "Pagar" button is still active, allowing for a retry.
+
+#### Case 3: User Cancellation
+1. Follow steps 1-3 from Case 1.
+2. In the "Mock de Pago" modal, click the "**Cancelado por usuario**" option (or close the modal).
+3. **Expected Result**: A message like "Pago cancelado por el usuario" appears in the chat. The application remains on the payment summary screen (Step 3), with the "Pagar" button active.
+
+#### Case 4: Technical Error
+1. Follow steps 1-3 from Case 1.
+2. In the "Mock de Pago" modal, click the "**Error técnico**" option.
+3. **Expected Result**: A non-blocking alert or toast message appears indicating a technical error. The application remains on the payment summary screen (Step 3), with the "Pagar" button active for a retry.
+```
