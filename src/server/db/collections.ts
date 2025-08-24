@@ -41,6 +41,10 @@ export async function createTransaction(
 
 
 export async function logPaymentEvent(result: PaymentResult) {
+    if (!result.reference) {
+      console.error("logPaymentEvent called without a reference. Skipping log.");
+      return;
+    }
     const paymentRef = doc(firestore, collections.transaction(result.reference));
     const dataToLog = {
       id: result.reference,

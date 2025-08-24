@@ -253,7 +253,6 @@ export default function TramiteFacil() {
   const handlePaymentResult = useCallback(async (result: PaymentResult) => {
     setIsProcessingPayment(false);
     log('INFO', 'Received payment result in main component.', { result });
-    await logPaymentEvent(result);
   
     if (result.status === 'APPROVED') {
       log('SUCCESS', 'Payment approved, handling success.', { result });
@@ -300,15 +299,15 @@ export default function TramiteFacil() {
 
   const handleMockResult = useCallback(
     async (result: MockResult) => {
+      setIsProcessingPayment(false);
+      setIsMockModalOpen(false);
+
       log('INFO', 'Mock payment result received.', {
         modo: 'mock',
         result,
         tramite: selectedTramite?.name,
         timestamp: new Date().toISOString(),
       });
-  
-      setIsProcessingPayment(false);
-      setIsMockModalOpen(false);
   
       switch (result) {
         case 'success': {
@@ -318,27 +317,18 @@ export default function TramiteFacil() {
             description: 'Pago aprobado (simulado).',
           });
           
-          await handlePaymentResult({
+          handlePaymentResult({
             status: 'APPROVED',
             reference: mockReference,
-            transactionId: `wompi_mock_${uuidv4()}`,
-          });
-
-          await fetch('/api/webhooks/wompi', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              data: {
-                transaction: {
-                  transactionId: mockReference,
-                  wompiId: `wompi_mock_${uuidv4()}`,
-                },
-              },
-            }),
+            transactionId: `wompi_${mockReference}`,
           });
           break;
         }
         case 'insufficient':
+          addMessage('lia', <div className="flex items-center gap-2">
+            <AlertTriangle className="text-amber-500" />
+            <span>Saldo insuficiente. Por favor, intenta con otro método de pago.</span>
+          </div>);
           toast({
             variant: 'destructive',
             title: 'Saldo Insuficiente',
@@ -346,6 +336,10 @@ export default function TramiteFacil() {
           });
           break;
         case 'error':
+          addMessage('lia', <div className="flex items-center gap-2">
+            <XCircle className="text-destructive" />
+            <span>Ocurrió un error técnico. Por favor, intenta de nuevo más tarde.</span>
+          </div>);
           toast({
             variant: 'destructive',
             title: 'Error de Pago',
@@ -658,6 +652,16 @@ export default function TramiteFacil() {
     if (flowState.step === 1) {
       return messages.slice(0, 2);
     }
+    // Hide payment summary card after payment is successful
+    if (flowState.step === 4 && flowState.status !== 'paying') {
+      return messages.filter(msg => {
+        if (React.isValidElement(msg.content) && msg.content.type === Payment) {
+          return false;
+        }
+        return true;
+      });
+    }
+
     return messages.slice(1);
   };
 
