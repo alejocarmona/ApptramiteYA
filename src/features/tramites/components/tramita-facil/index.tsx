@@ -60,10 +60,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import {buttonVariants} from '@/components/ui/button';
 import {useAppLogger} from '@/lib/logger';
-import { v4 as uuidv4 } from 'uuid';
-import type { PaymentResult } from '@/types/payment';
+import {v4 as uuidv4} from 'uuid';
+import type {PaymentResult} from '@/types/payment';
 import PaymentMockDialog from '@/components/payments/PaymentMock';
-import { usePaymentMock } from '@/lib/flags';
+import {usePaymentMock} from '@/lib/flags';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -306,7 +306,7 @@ export default function TramiteFacil() {
           <span>Pago aprobado. ¡Gracias!</span>
         </div>
       );
-      setFlowState(prev => ({...prev, status: 'generating', step: 4}));
+      setFlowState(prev => ({...prev, step: 4, status: 'generating'}));
     } else {
       log('ERROR', 'Payment failed or was declined.', {result});
       const content = {
