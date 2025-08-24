@@ -331,7 +331,20 @@ export default function TramiteFacil() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setFlowState(prev => ({...prev, step: 1, status: 'selecting'}))}>
+          <DropdownMenuItem onSelect={() => {
+            setFlowState(prev => ({...prev, step: 1, status: 'selecting'}));
+            setMessages([]);
+            setSelectedTramite(null);
+            setTimeout(() => {
+                addMessage('lia', <WelcomeHero />);
+                addMessage(
+                    'lia',
+                    <div id="tramite-selector">
+                    <TramiteSelector onSelect={handleTramiteSelect} />
+                    </div>
+                );
+            }, 100);
+          }}>
             Cambiar trámite
           </DropdownMenuItem>
           <AlertDialogTrigger asChild>
@@ -520,6 +533,14 @@ export default function TramiteFacil() {
 
   const currentStep = flowState.step;
 
+  const getVisibleMessages = () => {
+    if (flowState.status === 'selecting') {
+        return messages.filter(msg => msg.content && (msg.content as React.ReactElement).type === WelcomeHero || (msg.content as React.ReactElement).type.toString().includes('TramiteSelector'));
+    }
+    const lastWelcomeIndex = messages.map(m => m.content && (m.content as React.ReactElement).type === WelcomeHero).lastIndexOf(true);
+    return messages.slice(lastWelcomeIndex + 2);
+  }
+
   return (
     <Card
       className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl"
@@ -537,7 +558,7 @@ export default function TramiteFacil() {
             <p className="text-sm text-muted-foreground">Asistente LIA</p>
           </div>
         </div>
-        {currentStep > 1 ? <OverflowMenu /> : <div style={{width: 40}} />}
+        {currentStep > 1 ? <OverflowMenu /> : <Button variant="ghost" size="icon" onClick={() => resetState()}><RefreshCcw className="w-5 h-5" /></Button>}
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -555,15 +576,17 @@ export default function TramiteFacil() {
           ref={scrollAreaRef}
           aria-live="polite"
         >
-          <div className={cn("p-6", currentStep !== 1 && "hidden")}>
-             <WelcomeHero />
-             <div id="tramite-selector">
-                <TramiteSelector onSelect={handleTramiteSelect} />
-             </div>
-          </div>
+            {flowState.step === 1 && (
+                <div className="p-6">
+                    <WelcomeHero />
+                    <div id="tramite-selector">
+                        <TramiteSelector onSelect={handleTramiteSelect} />
+                    </div>
+                </div>
+            )}
         
-          <div className={cn("space-y-6 p-6", currentStep === 1 && "hidden")}>
-            {messages.map((msg) => (
+          <div className={cn("space-y-6 p-6", flowState.step === 1 && "hidden")}>
+            {getVisibleMessages().map((msg) => (
               <ChatBubble
                 key={msg.id}
                 sender={msg.sender}
@@ -615,7 +638,10 @@ export default function TramiteFacil() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => setFlowState(prev => ({...prev, step: 1, status: 'selecting'}))}
+            onClick={() => {
+                setFlowState(prev => ({...prev, step: 1, status: 'selecting'}));
+                // We don't need to add messages here, the main component will show the welcome screen
+            }}
             disabled={isLiaTyping}
             aria-label="Atrás"
             className="min-h-[44px] min-w-[44px]"
@@ -649,5 +675,3 @@ export default function TramiteFacil() {
     </Card>
   );
 }
-
-    

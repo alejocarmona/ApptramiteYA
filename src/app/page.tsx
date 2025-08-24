@@ -1,3 +1,5 @@
+"use client"
+
 import TramiteFacil from "@/features/tramites/components/tramita-facil";
 
 export default function Home() {
