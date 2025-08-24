@@ -247,6 +247,17 @@ export default function TramiteFacil() {
     setMessages(prev => [...prev, newMessage]);
   }, [log]);
   
+  const resetFlow = useCallback(() => {
+    log('INFO', 'Resetting flow.');
+    setFlowState(initialFlow);
+    setSelectedTramite(null);
+    setFormData({});
+    setCurrentField(0);
+    setIsLiaTyping(false);
+    setUserInput('');
+    setMessages([]);
+  }, [log]);
+  
   const handleTramiteSelect = useCallback((tramite: Tramite) => {
     log('INFO', `Tramite selected: ${tramite.id}`);
     setMessages(currentMessages => currentMessages.slice(0, 1));
@@ -278,18 +289,7 @@ export default function TramiteFacil() {
       </div>
     );
   },[addMessage, log, handleTramiteSelect]);
-  
-  const resetFlow = useCallback(() => {
-    log('INFO', 'Resetting flow.');
-    setFlowState(initialFlow);
-    setSelectedTramite(null);
-    setFormData({});
-    setCurrentField(0);
-    setIsLiaTyping(false);
-    setUserInput('');
-    setMessages([]);
-  }, [log]);
-  
+
   useEffect(() => {
     if (messages.length === 0) {
       startInitialFlow();
@@ -335,7 +335,7 @@ export default function TramiteFacil() {
   };
   
   const handlePay = useCallback(() => {
-    if (!selectedTramite) return;
+    if (!selectedTramite || isProcessingPayment) return;
     
     log('INFO', `Payment initiated for ${selectedTramite.id}. Is mock: ${isMock}`);
     setIsProcessingPayment(true);
@@ -355,7 +355,7 @@ export default function TramiteFacil() {
         variant: 'destructive',
       });
     }
-  }, [isMock, selectedTramite, log, toast]);
+  }, [isMock, selectedTramite, log, toast, isProcessingPayment]);
 
   const handleCancelFlow = useCallback(async (reason?: string) => {
     log('WARN', `Flow cancellation requested. Reason: ${reason}`, {
@@ -476,8 +476,9 @@ export default function TramiteFacil() {
   const handleMockClose = () => {
     log('INFO', 'Mock modal closed by user.');
     setIsMockModalOpen(false);
+    setIsProcessingPayment(false); // Also reset processing state
     if (currentMockReference) {
-      handlePaymentResult({
+       handlePaymentResult({
         status: 'CANCELLED',
         reference: currentMockReference,
         transactionId: `mock_${Math.random().toString(36).slice(2, 10)}`,
