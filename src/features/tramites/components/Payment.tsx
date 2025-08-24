@@ -1,4 +1,3 @@
-
 'use client';
 
 import {useState} from 'react';
@@ -15,8 +14,8 @@ import {
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
 import PaymentMock from '@/components/payments/PaymentMock';
-import { usePaymentMock } from '@/lib/flags';
-import type { PaymentResult } from '@/types/payment';
+import {usePaymentMock} from '@/lib/flags';
+import type {PaymentResult} from '@/types/payment';
 
 type PaymentProps = {
   price: number;
@@ -31,10 +30,11 @@ export default function Payment({
   tramiteName,
   formData,
   onPaymentResult,
+  onPaymentError,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
-  
+
   const isMockEnabled = usePaymentMock();
 
   const handlePayment = async () => {
@@ -45,17 +45,19 @@ export default function Payment({
       // Processing will be set to false inside handleMockResult
     } else {
       // Real payment logic would go here. For now, we show an error.
-      onPaymentError('El servicio de pago real no está implementado en este momento.');
+      onPaymentError(
+        'El servicio de pago real no está implementado en este momento.'
+      );
       setIsProcessing(false);
     }
   };
-  
+
   const handleMockResult = (result: PaymentResult) => {
     setShowMockModal(false);
     setIsProcessing(false); // Stop processing after mock result is received
     onPaymentResult(result);
   };
-  
+
   const serviceFee = 2500;
   const iva = (price + serviceFee) * 0.19;
   const total = price + serviceFee + iva;
@@ -146,7 +148,7 @@ export default function Payment({
           className="border-transparent bg-green-100/80 font-normal text-green-900"
         >
           <ShieldCheck className="mr-1.5 h-4 w-4 text-green-600" />
-          {isMockEnabled ? "Pago Simulado" : "Wompi by Bancolombia – PCI DSS"}
+          {isMockEnabled ? 'Pago Simulado' : 'Wompi by Bancolombia – PCI DSS'}
         </Badge>
       </div>
 
@@ -164,11 +166,11 @@ export default function Payment({
           <span>Soporte 24/7</span>
         </div>
       </div>
-       <PaymentMock
+      <PaymentMock
         open={showMockModal}
         onClose={() => {
-            setShowMockModal(false);
-            setIsProcessing(false);
+          setShowMockModal(false);
+          setIsProcessing(false);
         }}
         onResult={handleMockResult}
       />

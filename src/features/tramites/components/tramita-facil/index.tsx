@@ -267,7 +267,8 @@ export default function TramiteFacil() {
 
   const handleTramiteSelect = useCallback(
     (tramite: Tramite) => {
-      setMessages((currentMessages) => currentMessages.slice(0, 2));
+      // Keep only the first welcome message, remove the selector
+      setMessages((currentMessages) => currentMessages.slice(0, 1));
       
       addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
       setSelectedTramite(tramite);
@@ -404,7 +405,6 @@ export default function TramiteFacil() {
   
     // Ask the first question right after the intro message from LIA.
     if (currentField === 0 && lastMessage.sender === 'lia') {
-      // Check if the message content is the intro to avoid re-asking.
       const isIntroMessage = (lastMessage.content as React.ReactElement)?.props?.children?.[0]?.props?.children === '¡Excelente elección!';
       if (isIntroMessage) {
         askNextQuestion();
@@ -474,6 +474,7 @@ export default function TramiteFacil() {
   };
   
   const handlePaymentResult = async (result: PaymentResult) => {
+    // This is the orchestrator. It ensures operations happen in sequence.
     await logPaymentEvent(result);
     setFlowState((prev) => ({ ...prev, transactionId: result.reference }));
   
@@ -502,14 +503,6 @@ export default function TramiteFacil() {
   };
 
   const currentStep = flowState.step;
-
-  const getVisibleMessages = () => {
-      // Hide the initial welcome and selector messages after a selection is made
-      if (flowState.status !== 'selecting') {
-          return messages.slice(2);
-      }
-      return messages;
-  }
 
   const showChatInterface = flowState.status !== 'selecting';
 
@@ -550,7 +543,7 @@ export default function TramiteFacil() {
         >
             <div className="space-y-6 p-6">
                 {messages.map((msg) => (
-                    // When status is not 'selecting', we hide the first two messages
+                    // When status is not 'selecting', we hide the initial welcome and selector
                     <div key={msg.id} className={cn(showChatInterface && messages.indexOf(msg) < 2 && 'hidden')}>
                         {msg.sender === 'lia' ? (
                             <ChatBubble sender="lia" content={msg.content} />
