@@ -355,11 +355,8 @@ export default function TramiteFacil() {
   );
 
   const handlePay = useCallback(() => {
-    if (isProcessingPayment) return;
-
     log('INFO', `Payment initiated. Is mock: ${isMock}`);
-    setIsProcessingPayment(true);
-    
+
     const reference = `MOCK-${uuidv4()}`;
     log('INFO', 'Initiating MOCK payment with hardcoded success.', {reference});
 
@@ -371,7 +368,7 @@ export default function TramiteFacil() {
     };
     handlePaymentResult(result);
 
-  }, [isMock, log, isProcessingPayment, handlePaymentResult]);
+  }, [isMock, log, handlePaymentResult]);
 
   const resetFlow = useCallback(() => {
     log('INFO', 'Resetting flow.');
@@ -542,7 +539,7 @@ export default function TramiteFacil() {
         />
       );
     }
-
+    
     if (flowState.status === 'generating') {
       const timer = setTimeout(() => {
         log('SUCCESS', 'Document generation simulation finished.');
