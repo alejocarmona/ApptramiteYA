@@ -1,7 +1,7 @@
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
-import {z} from "zod";
-import fetch from "node-fetch";
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
+import {z, ZodError} from 'zod';
+import fetch from 'node-fetch';
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -11,97 +11,77 @@ const firestore = admin.firestore();
 const WompiCallableRequestSchema = z.object({
   tramiteName: z.string(),
   amountInCents: z.number().positive(),
+  currency: z.string().length(3),
+  reference: z.string().min(6),
   formData: z.record(z.string(), z.any()),
+  paymentMethod: z.any(), // In a real app, this would be more specific
 });
 
 // Define collection paths
 const collections = {
-  transactions: () => "transactions",
+  transactions: () => 'transactions',
   transaction: (id: string) => `transactions/${id}`,
 };
 
-// Define Transaction document type (mirroring frontend)
-interface TransactionDoc {
-  id?: string;
-  tramiteId: string;
-  tramiteName: string;
-  amount: number; // amount in COP, not cents
-  currency: string;
-  status: "pending" | "paid" | "failed" | "delivered" | "cancelled";
-  formData: Record<string, any>;
-  wompiId?: string;
-  createdAt: admin.firestore.FieldValue;
-  updatedAt: admin.firestore.FieldValue;
-  paidAt?: admin.firestore.FieldValue;
-  deliveredAt?: admin.firestore.FieldValue;
-  cancelledAt?: admin.firestore.FieldValue;
-  cancellationReason?: string;
-}
-
 export const createWompiTransaction = functions.https.onCall(
   async (data, context) => {
-    // 1. Validate request body with Zod
-    const validation = WompiCallableRequestSchema.safeParse(data);
-    if (!validation.success) {
-      console.error("Invalid request body:", validation.error.flatten());
-      throw new functions.https.HttpsError(
-        "invalid-argument",
-        "The function must be called with the correct arguments.",
-        validation.error.flatten().fieldErrors
-      );
-    }
-
-    const {tramiteName, amountInCents, formData} = validation.data;
-    const amountInCop = amountInCents / 100;
-
-    // 2. Get Wompi credentials from Firebase config
-    const wompiPrivateKey = functions.config().wompi.private;
-    const wompiUrl = functions.config().wompi.url;
-
-    if (!wompiPrivateKey || !wompiUrl) {
-      console.error("Wompi credentials are not configured in Firebase.");
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "The payment provider is not configured."
-      );
-    }
-
-    // 3. Create a transaction document in Firestore
-    const transactionRef = firestore.collection(collections.transactions()).doc();
-    const transactionId = transactionRef.id;
-
-    const newTransaction: TransactionDoc = {
-      id: transactionId,
-      tramiteId: tramiteName, // Assuming name is unique for now
-      tramiteName,
-      amount: amountInCop,
-      formData,
-      status: "pending",
-      currency: "COP",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-    await transactionRef.set(newTransaction);
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const log = (payload: any) => console.error('createWompiTransaction', {requestId, ...payload});
     
-    // 4. Prepare and make the call to Wompi
-    const wompiPayload = {
-      amount_in_cents: amountInCents,
-      currency: "COP",
-      customer_email: formData.email || `user-${Date.now()}@example.com`,
-      payment_method: {
-        type: "CARD", // Example, would ideally come from client
-        installments: 1,
-      },
-      reference: transactionId,
-      // In a real app, you'd add customer_data, shipping_address, etc.
-    };
+    const WOMPI_PRIVATE = functions.config().wompi?.private || process.env.WOMPI_PRIVATE;
+    const WOMPI_URL = functions.config().wompi?.url || process.env.WOMPI_URL || 'https://sandbox.wompi.co/v1';
+    
+    if (!WOMPI_PRIVATE) {
+      log({error: 'WOMPI_PRIVATE key is not configured.'});
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'missing_wompi_private',
+        {requestId}
+      );
+    }
 
     try {
-      const response = await fetch(`${wompiUrl}/transactions`, {
-        method: "POST",
+      // 1. Validate request body with Zod
+      const validation = WompiCallableRequestSchema.parse(data);
+      const {
+        tramiteName,
+        amountInCents,
+        currency,
+        reference,
+        formData,
+        paymentMethod,
+      } = validation;
+
+      // 2. Create a transaction document in Firestore for auditing
+      const transactionRef = firestore.collection(collections.transactions()).doc(reference);
+      const transactionId = transactionRef.id;
+
+      await transactionRef.set({
+        id: transactionId,
+        uid: context.auth?.uid || null,
+        tramiteName,
+        amountInCents,
+        currency,
+        status: 'initiated',
+        formData,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // 3. Prepare and make the call to Wompi
+      const wompiPayload = {
+        amount_in_cents: amountInCents,
+        currency,
+        customer_email: formData.email || `user-${Date.now()}@example.com`,
+        payment_method: paymentMethod,
+        reference: transactionId,
+      };
+
+      const response = await fetch(`${WOMPI_URL}/transactions`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${wompiPrivateKey}`,
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${WOMPI_PRIVATE}`,
         },
         body: JSON.stringify(wompiPayload),
       });
@@ -109,47 +89,72 @@ export const createWompiTransaction = functions.https.onCall(
       const wompiResult = (await response.json()) as any;
 
       if (!response.ok) {
-        console.error("Wompi API error:", wompiResult);
-        const errorDetail =
-          wompiResult?.error?.messages ||
-          wompiResult?.error ||
-          "Unknown Wompi error";
-        // Optionally update Firestore doc to 'failed' here
-        await transactionRef.update({
-          status: "failed",
-          cancellationReason: JSON.stringify(errorDetail),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        log({
+          error: 'Wompi API error',
+          status: response.status,
+          body: wompiResult,
         });
         throw new functions.https.HttpsError(
-          "aborted",
-          "Payment provider rejected the transaction.",
-          errorDetail
+          'failed-precondition',
+          'wompi_error',
+          {status: response.status, body: wompiResult, requestId}
         );
       }
-
-      // 5. Update transaction with Wompi ID
+      
+      // 4. Update transaction with Wompi ID and new status
       await transactionRef.update({
         wompiId: wompiResult.data.id,
+        status: 'created',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // 6. Return a successful JSON response
+      // 5. Return a successful JSON response
       return {
         ok: true,
-        message: "Payment initiation started successfully.",
+        message: 'Payment initiation started successfully.',
         transactionId: transactionId,
         wompiTransaction: wompiResult.data,
       };
+
     } catch (error: any) {
-      console.error("Error calling Wompi or processing transaction:", error);
-      if (error instanceof functions.https.HttpsError) {
-        throw error; // Re-throw HttpsError
+      if (error instanceof ZodError) {
+        log({error: 'Invalid request body', issues: error.issues});
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'Invalid data provided.',
+          {issues: error.issues, requestId}
+        );
       }
-      throw new functions.https.HttpsError(
-        "internal",
-        "An internal error occurred while processing the payment.",
-        error.message
-      );
+      
+      if (error instanceof functions.https.HttpsError) {
+        // Re-throw HttpsError to be caught correctly by the client
+        throw error;
+      }
+
+      log({error: 'Unexpected internal error', message: error.message, stack: error.stack});
+      throw new functions.https.HttpsError('internal', 'unexpected_error', {
+        message: error.message,
+        requestId,
+      });
     }
   }
 );
+
+
+export const wompiHealth = functions.https.onCall(async (data, context) => {
+    const WOMPI_PRIVATE = functions.config().wompi?.private || process.env.WOMPI_PRIVATE;
+    const WOMPI_URL = functions.config().wompi?.url || process.env.WOMPI_URL;
+
+    if (!WOMPI_PRIVATE || !WOMPI_URL) {
+        throw new functions.https.HttpsError(
+            'failed-precondition',
+            'missing_config'
+        );
+    }
+
+    return {
+        ok: true,
+        url: WOMPI_URL,
+        hasKey: !!WOMPI_PRIVATE,
+    };
+});

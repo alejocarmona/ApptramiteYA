@@ -1,8 +1,9 @@
-// This file is intended for client-side use only.
 'use client';
-import {initializeApp, getApp, getApps, type FirebaseApp} from 'firebase/app';
-import {getFunctions, type Functions} from 'firebase/functions';
+// This file is intended for client-side use only.
+
 import {env} from '@/config/env';
+import {getApp, getApps, initializeApp, type FirebaseApp} from 'firebase/app';
+import {getFunctions, type Functions} from 'firebase/functions';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -19,7 +20,7 @@ const FIREBASE_REGION = 'us-central1';
 
 /**
  * Returns the initialized Firebase App instance, creating it if it doesn't exist.
- * This singleton pattern ensures that Firebase is only initialized once.
+ * This singleton pattern ensures that Firebase is only initialized once on the client.
  * @returns {FirebaseApp} The initialized Firebase App.
  */
 function getFirebaseApp(): FirebaseApp {
@@ -31,8 +32,10 @@ function getFirebaseApp(): FirebaseApp {
 
 /**
  * Returns a Firebase Functions instance for the specified region.
+ * This function ensures the Firebase app is initialized before getting the Functions instance.
  * @returns {Functions} The Firebase Functions service instance.
  */
 export function getFirebaseFunctions(): Functions {
-  return getFunctions(getFirebaseApp(), FIREBASE_REGION);
+  const app = getFirebaseApp();
+  return getFunctions(app, FIREBASE_REGION);
 }

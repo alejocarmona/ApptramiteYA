@@ -1,7 +1,7 @@
 
 'use client';
 
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {Button} from '@/components/ui/button';
 import {
   CreditCard,
@@ -13,10 +13,10 @@ import {
 } from 'lucide-react';
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
-import {httpsCallable} from 'firebase/functions';
+import {httpsCallable, Functions} from 'firebase/functions';
 import {useToast} from '@/hooks/use-toast';
-import { getFirebaseFunctions } from '@/lib/firebase';
-
+import {getFirebaseFunctions} from '@/lib/firebase';
+import {FirebaseError} from 'firebase/app';
 
 type PaymentProps = {
   price: number;
@@ -27,6 +27,14 @@ type PaymentProps = {
   onPaymentError: (message: string) => void;
 };
 
+// Initialize functions instance once
+let functions: Functions;
+try {
+  functions = getFirebaseFunctions();
+} catch (error) {
+  console.error("Could not initialize Firebase Functions:", error);
+}
+
 export default function Payment({
   price,
   tramiteName,
@@ -36,23 +44,68 @@ export default function Payment({
   onPaymentError,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const { toast } = useToast();
+  const [isHealthChecked, setIsHealthChecked] = useState(false);
+  const {toast} = useToast();
+
+  // Perform a health check on component mount
+  useEffect(() => {
+    const checkHealth = async () => {
+      if (!functions) {
+        toast({
+          title: 'Error de Configuración',
+          description: 'El servicio de pagos no está disponible en este momento.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      try {
+        const wompiHealth = httpsCallable(functions, 'wompiHealth');
+        await wompiHealth();
+        setIsHealthChecked(true);
+      } catch (error: any) {
+        console.error('Payment service health check failed:', error);
+        toast({
+          title: 'Servicio no disponible',
+          description: `El sistema de pagos no está configurado correctamente. Por favor, intenta más tarde.`,
+          variant: 'destructive',
+        });
+      }
+    };
+
+    if (!isHealthChecked) {
+      checkHealth();
+    }
+  }, [isHealthChecked, toast]);
 
   const handlePayment = async () => {
     setIsProcessing(true);
 
+    if (!isHealthChecked) {
+      onPaymentError('El servicio de pagos no está disponible. Intenta de nuevo más tarde.');
+      setIsProcessing(false);
+      return;
+    }
+    
     const serviceFee = 2500;
     const iva = (price + serviceFee) * 0.19;
     const totalInCents = Math.round((price + serviceFee + iva) * 100);
+    const reference = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
     try {
-      const functions = getFirebaseFunctions();
       const createWompiTransaction = httpsCallable(functions, 'createWompiTransaction');
-      
+
       const result: any = await createWompiTransaction({
-          tramiteName: tramiteName,
-          amountInCents: totalInCents,
-          formData: formData,
+        tramiteName: tramiteName,
+        amountInCents: totalInCents,
+        currency: 'COP',
+        reference: reference,
+        formData: formData,
+        paymentMethod: {
+          // This is an example, in a real app this would come from a form
+          type: 'CARD',
+          installments: 1,
+        },
       });
 
       if (result.data.ok && result.data.transactionId) {
@@ -62,22 +115,44 @@ export default function Payment({
         setTimeout(() => {
           onPaymentSuccess();
         }, 2000);
-
       } else {
         throw new Error(result.data.error || 'Respuesta inesperada del servidor.');
       }
-
     } catch (error: any) {
       console.error('Payment failed:', error);
-      const errorMessage = error.details?.message || error.message || 'Ocurrió un error desconocido.';
-      onPaymentError(`No pudimos iniciar el proceso de pago. Detalle: ${errorMessage}`);
-      toast({
-        title: 'Error de Pago',
-        description: `No pudimos iniciar el proceso de pago. Detalle: ${errorMessage}`,
-        variant: 'destructive',
-      })
+
+      let title = 'Error de Pago';
+      let description = 'Ocurrió un error desconocido al procesar el pago.';
+      
+      if (error.code && error.message) {
+         const details = error.details as any;
+         const requestId = details?.requestId;
+
+        switch (error.code) {
+          case 'invalid-argument':
+            title = 'Datos Inválidos';
+            description = 'Por favor, revisa los datos del pago e intenta de nuevo.';
+            break;
+          case 'failed-precondition':
+            if (error.message === 'missing_wompi_private' || error.message === 'missing_config') {
+              title = 'Servicio en Mantenimiento';
+              description = 'El servicio de pago no está disponible temporalmente. Intenta más tarde.';
+            } else if (error.message === 'wompi_error') {
+               title = 'Error del Proveedor de Pagos';
+               description = `No pudimos crear la transacción (código ${details?.status}). Intenta de nuevo.`;
+            }
+            break;
+          case 'internal':
+            title = 'Error Interno';
+            description = `Ocurrió un error inesperado. Si persiste, contacta a soporte. (ID: ${requestId || 'N/A'})`;
+            break;
+        }
+      }
+
+      onPaymentError(description);
+      toast({ title, description, variant: 'destructive' });
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   };
 
@@ -137,7 +212,7 @@ export default function Payment({
       <div className="pt-2">
         <Button
           onClick={handlePayment}
-          disabled={isProcessing}
+          disabled={isProcessing || !isHealthChecked}
           className="h-12 w-full bg-green-500 text-base text-white transition-all hover:bg-green-600 hover:scale-105"
           size="lg"
         >
