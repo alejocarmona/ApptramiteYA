@@ -246,7 +246,7 @@ export default function TramiteFacil() {
     log('INFO', `Adding message from ${sender}`, {id: newMessage.id});
     setMessages(prev => [...prev, newMessage]);
   }, [log]);
-
+  
   const handleTramiteSelect = useCallback((tramite: Tramite) => {
     log('INFO', `Tramite selected: ${tramite.id}`);
     setMessages(currentMessages => currentMessages.slice(0, 1));
@@ -288,9 +288,14 @@ export default function TramiteFacil() {
     setIsLiaTyping(false);
     setUserInput('');
     setMessages([]);
-    startInitialFlow();
-  }, [startInitialFlow, log]);
+  }, []);
   
+  useEffect(() => {
+    if (messages.length === 0) {
+      startInitialFlow();
+    }
+  }, [messages.length, startInitialFlow]);
+
   const handlePaymentResult = useCallback(async (result: PaymentResult) => {
     setIsProcessingPayment(false);
     log('INFO', 'Received payment result in main component.', {result});
@@ -403,8 +408,11 @@ export default function TramiteFacil() {
     const flowId = `${flowState.status}-${flowState.step}`;
     log('INFO', `Flow updated: ${flowId}`, {currentField, isLiaTyping});
 
+    const lastMessage = messages[messages.length - 1];
+    const isLiaTurn = !lastMessage || lastMessage.sender === 'user';
+
     // Step 2: Filling form data
-    if (flowState.status === 'filling' && selectedTramite) {
+    if (flowState.status === 'filling' && selectedTramite && isLiaTurn && !isLiaTyping) {
       const allFieldsFilled = currentField >= selectedTramite.dataRequirements.length;
 
       if (allFieldsFilled) {
@@ -413,32 +421,23 @@ export default function TramiteFacil() {
         return;
       }
 
-      const lastMessage = messages[messages.length - 1];
-      const isLiaTurn = lastMessage?.sender === 'user' || messages.length <= 2;
-
-      if (isLiaTurn && !isLiaTyping) {
-        setIsLiaTyping(true);
-        setTimeout(() => {
-          if (currentField === 0) {
-            addMessage('lia', <>
-                <p>¡Excelente elección!</p>
-                <p>Para el <strong>{selectedTramite.name}</strong>, necesitaré algunos datos.</p>
-                <p className="mt-2">{selectedTramite.dataRequirements[currentField].label}:</p>
-              </>);
-          } else {
-            addMessage('lia', `Por favor, ingresa tu ${selectedTramite.dataRequirements[currentField].label.toLowerCase()}:`);
-          }
-          setIsLiaTyping(false);
-        }, 500);
-      }
+      setIsLiaTyping(true);
+      setTimeout(() => {
+        if (currentField === 0) {
+          addMessage('lia', <>
+              <p>¡Excelente elección!</p>
+              <p>Para el <strong>{selectedTramite.name}</strong>, necesitaré algunos datos.</p>
+              <p className="mt-2">{selectedTramite.dataRequirements[currentField].label}:</p>
+            </>);
+        } else {
+          addMessage('lia', `Por favor, ingresa tu ${selectedTramite.dataRequirements[currentField].label.toLowerCase()}:`);
+        }
+        setIsLiaTyping(false);
+      }, 500);
     }
-
-    // Step 3: Waiting for payment
-    if (flowState.status === 'paying' && selectedTramite) {
-      const lastMessageContent = messages[messages.length - 1]?.content;
-      if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === Payment) {
-        return; 
-      }
+    
+    const lastMessageIsPayment = lastMessage?.content && typeof lastMessage.content === 'object' && React.isValidElement(lastMessage.content) && lastMessage.content.type === Payment;
+    if (flowState.status === 'paying' && selectedTramite && !lastMessageIsPayment) {
        addMessage('lia', <div className="flex items-center gap-2"> <CheckCircle2 className="text-green-500" /> <span>¡Perfecto! Hemos reunido toda la información.</span> </div>);
        addMessage('lia', 
          <Payment 
@@ -450,26 +449,17 @@ export default function TramiteFacil() {
        );
     }
 
-    // Step 4: Generating document
-    if (flowState.status === 'generating') {
-      const lastMessageContent = messages[messages.length - 1]?.content;
-      if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === DocumentGenerationProgress) {
-        return;
-      }
+    const lastMessageIsProgress = lastMessage?.content && typeof lastMessage.content === 'object' && React.isValidElement(lastMessage.content) && lastMessage.content.type === DocumentGenerationProgress;
+    if (flowState.status === 'generating' && !lastMessageIsProgress) {
       addMessage('lia', <DocumentGenerationProgress />);
-      
       setTimeout(async () => {
         log('SUCCESS', 'Document generation simulation finished.');
         setFlowState(prev => ({...prev, status: 'completed'}));
       }, 7000);
     }
     
-    // Step 4: Completed
-    if (flowState.status === 'completed' && selectedTramite) {
-       const lastMessageContent = messages[messages.length - 1]?.content;
-       if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === DocumentDownloader) {
-          return;
-       }
+    const lastMessageIsDownloader = lastMessage?.content && typeof lastMessage.content === 'object' && React.isValidElement(lastMessage.content) && lastMessage.content.type === DocumentDownloader;
+    if (flowState.status === 'completed' && selectedTramite && !lastMessageIsDownloader) {
         addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
         addMessage('lia', <DocumentDownloader tramiteName={selectedTramite.name} onReset={resetFlow} />);
     }
@@ -487,11 +477,6 @@ export default function TramiteFacil() {
     handlePay,
     isProcessingPayment,
   ]);
-
-  useEffect(() => {
-    startInitialFlow();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -684,3 +669,5 @@ export default function TramiteFacil() {
     </>
   );
 }
+
+    
