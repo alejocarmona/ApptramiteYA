@@ -252,8 +252,37 @@ export default function TramiteFacil() {
     []
   );
 
+  const resetFlow = useCallback(() => {
+    setFlowState(initialFlow);
+    setSelectedTramite(null);
+    setFormData({});
+    setCurrentField(0);
+    setIsLiaTyping(false);
+    setUserInput('');
+    setMessages([
+        {
+            sender: 'lia',
+            content: <WelcomeHero />,
+            id: getUniqueMessageId(),
+        },
+        {
+            sender: 'lia',
+            content: (
+                <div id="tramite-selector">
+                    <TramiteSelector onSelect={(tramite) => handleTramiteSelect(tramite, true)} />
+                </div>
+            ),
+            id: getUniqueMessageId(),
+        }
+    ]);
+  }, [addMessage]);
+
   const handleTramiteSelect = useCallback(
-    (tramite: Tramite) => {
+    (tramite: Tramite, isNewFlow = false) => {
+      if (isNewFlow) {
+          setMessages(currentMessages => currentMessages.slice(0, 2));
+      }
+      
       addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
       setSelectedTramite(tramite);
       setFlowState({
@@ -279,34 +308,6 @@ export default function TramiteFacil() {
     [addMessage]
   );
   
-  const resetState = useCallback((fromCancel = false) => {
-    setFlowState(initialFlow);
-    setMessages([]);
-    setSelectedTramite(null);
-    setFormData({});
-    setCurrentField(0);
-    setIsLiaTyping(false);
-    setUserInput('');
-
-    if (fromCancel) {
-       toast({
-        title: "Proceso cancelado",
-        description: "Puedes iniciar un nuevo trámite cuando quieras.",
-      });
-    }
-
-    setTimeout(() => {
-      addMessage('lia', <WelcomeHero />);
-      addMessage(
-        'lia',
-        <div id="tramite-selector">
-          <TramiteSelector onSelect={handleTramiteSelect} />
-        </div>
-      );
-    }, 100);
-  }, [addMessage, handleTramiteSelect, toast]);
-
-
   const handleCancelFlow = useCallback(
     async (reason?: string) => {
       if (flowState.transactionId) {
@@ -317,9 +318,13 @@ export default function TramiteFacil() {
           // Non-critical, proceed with UI reset
         }
       }
-      resetState(true);
+      resetFlow();
+      toast({
+        title: "Proceso cancelado",
+        description: "Puedes iniciar un nuevo trámite cuando quieras.",
+      });
     },
-    [flowState.transactionId, resetState]
+    [flowState.transactionId, resetFlow, toast]
   );
   
   const OverflowMenu = () => (
@@ -332,18 +337,7 @@ export default function TramiteFacil() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => {
-            setFlowState(prev => ({...prev, step: 1, status: 'selecting'}));
-            setMessages([]);
-            setSelectedTramite(null);
-            setTimeout(() => {
-                addMessage('lia', <WelcomeHero />);
-                addMessage(
-                    'lia',
-                    <div id="tramite-selector">
-                    <TramiteSelector onSelect={handleTramiteSelect} />
-                    </div>
-                );
-            }, 100);
+             resetFlow();
           }}>
             Cambiar trámite
           </DropdownMenuItem>
@@ -381,8 +375,8 @@ export default function TramiteFacil() {
   );
 
   useEffect(() => {
-    resetState();
-  }, [resetState]);
+    resetFlow();
+  }, []);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -426,7 +420,7 @@ export default function TramiteFacil() {
       const isLastMessageFromLia = lastMessage.sender === 'lia';
 
       // Ask first question right after tramite selection and LIA's confirmation.
-      if (currentField === 0 && isLastMessageFromLia && messages.length < 3) {
+      if (currentField === 0 && isLastMessageFromLia && messages.length <= 4) {
         askNextQuestion();
       }
       // Ask next question only after user has replied.
@@ -498,7 +492,7 @@ export default function TramiteFacil() {
         }
         setFlowState((prev) => ({...prev, step: 4, status: 'completed'}));
         setIsLiaTyping(false);
-        addMessage('lia', <SuccessCelebration onReset={() => resetState(false)} />);
+        addMessage('lia', <SuccessCelebration onReset={() => resetFlow()} />);
       }, 7000);
     }, 500);
   };
@@ -534,12 +528,14 @@ export default function TramiteFacil() {
   const currentStep = flowState.step;
 
   const getVisibleMessages = () => {
-    if (flowState.status === 'selecting') {
-        return messages.filter(msg => msg.content && (msg.content as React.ReactElement).type === WelcomeHero || (msg.content as React.ReactElement).type.toString().includes('TramiteSelector'));
-    }
-    const lastWelcomeIndex = messages.map(m => m.content && (m.content as React.ReactElement).type === WelcomeHero).lastIndexOf(true);
-    return messages.slice(lastWelcomeIndex + 2);
+      // Hide the initial welcome and selector messages after a selection is made
+      if (flowState.status !== 'selecting') {
+          return messages.slice(2);
+      }
+      return messages;
   }
+
+  const showChatInterface = flowState.status !== 'selecting';
 
   return (
     <Card
@@ -558,7 +554,7 @@ export default function TramiteFacil() {
             <p className="text-sm text-muted-foreground">Asistente LIA</p>
           </div>
         </div>
-        {currentStep > 1 ? <OverflowMenu /> : <Button variant="ghost" size="icon" onClick={() => resetState()}><RefreshCcw className="w-5 h-5" /></Button>}
+        {currentStep > 1 ? <OverflowMenu /> : <Button variant="ghost" size="icon" onClick={() => resetFlow()}><RefreshCcw className="w-5 h-5" /></Button>}
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -576,55 +572,56 @@ export default function TramiteFacil() {
           ref={scrollAreaRef}
           aria-live="polite"
         >
-            {flowState.step === 1 && (
+            {!showChatInterface && (
                 <div className="p-6">
-                    <WelcomeHero />
-                    <div id="tramite-selector">
-                        <TramiteSelector onSelect={handleTramiteSelect} />
-                    </div>
+                    {messages.map((msg) => (
+                         <div key={msg.id}>{msg.content}</div>
+                    ))}
                 </div>
             )}
         
-          <div className={cn("space-y-6 p-6", flowState.step === 1 && "hidden")}>
-            {getVisibleMessages().map((msg) => (
-              <ChatBubble
-                key={msg.id}
-                sender={msg.sender}
-                content={msg.content}
-              />
-            ))}
-            {isLiaTyping && flowState.status !== 'generating' && (
-              <ChatBubble
-                sender="lia"
-                content={<Loader2 className="animate-spin" />}
-              />
-            )}
-            {flowState.status === 'paying' && selectedTramite && (
-              <ChatBubble
-                sender="lia"
-                content={
-                  <Payment
-                    tramiteName={selectedTramite.name}
-                    price={selectedTramite.priceCop}
-                    formData={formData}
-                    onPaymentResult={handlePaymentResult}
-                    onPaymentError={handlePaymentError}
-                  />
-                }
-              />
-            )}
-            {flowState.status === 'completed' && selectedTramite && (
-              <ChatBubble
-                sender="lia"
-                content={
-                  <DocumentDownloader
-                    tramiteName={selectedTramite.name}
-                    onReset={() => resetState(false)}
-                  />
-                }
-              />
-            )}
-          </div>
+          {showChatInterface && (
+            <div className="space-y-6 p-6">
+                {getVisibleMessages().map((msg) => (
+                <ChatBubble
+                    key={msg.id}
+                    sender={msg.sender}
+                    content={msg.content}
+                />
+                ))}
+                {isLiaTyping && flowState.status !== 'generating' && (
+                <ChatBubble
+                    sender="lia"
+                    content={<Loader2 className="animate-spin" />}
+                />
+                )}
+                {flowState.status === 'paying' && selectedTramite && (
+                <ChatBubble
+                    sender="lia"
+                    content={
+                    <Payment
+                        tramiteName={selectedTramite.name}
+                        price={selectedTramite.priceCop}
+                        formData={formData}
+                        onPaymentResult={handlePaymentResult}
+                        onPaymentError={handlePaymentError}
+                    />
+                    }
+                />
+                )}
+                {flowState.status === 'completed' && selectedTramite && (
+                <ChatBubble
+                    sender="lia"
+                    content={
+                    <DocumentDownloader
+                        tramiteName={selectedTramite.name}
+                        onReset={() => resetFlow()}
+                    />
+                    }
+                />
+                )}
+            </div>
+          )}
         </ScrollArea>
       </CardContent>
 
@@ -639,8 +636,7 @@ export default function TramiteFacil() {
             variant="outline"
             size="icon"
             onClick={() => {
-                setFlowState(prev => ({...prev, step: 1, status: 'selecting'}));
-                // We don't need to add messages here, the main component will show the welcome screen
+                resetFlow();
             }}
             disabled={isLiaTyping}
             aria-label="Atrás"
