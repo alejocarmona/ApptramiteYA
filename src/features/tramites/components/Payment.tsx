@@ -33,7 +33,7 @@ type PaymentProps = {
   price: number;
   tramiteName: string;
   formData: Record<string, string>;
-  onPaymentSuccess: (result: PaymentResult) => void;
+  onPaymentResult: (result: PaymentResult) => void;
   onPaymentError: (message: string) => void;
 };
 
@@ -41,7 +41,7 @@ export default function Payment({
   price,
   tramiteName,
   formData,
-  onPaymentSuccess,
+  onPaymentResult,
   onPaymentError,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -104,7 +104,7 @@ export default function Payment({
 
     try {
       const result = await startPayment(paymentInput);
-      onPaymentSuccess(result);
+      onPaymentResult(result);
     } catch (error: any) {
        onPaymentError(error.message || 'Ocurrió un error desconocido.');
     } finally {
@@ -114,7 +114,7 @@ export default function Payment({
   
   const handleMockResult = (result: PaymentResult) => {
     setShowMockModal(false);
-    onPaymentSuccess(result);
+    onPaymentResult(result);
   };
   
   const canPay = (health.ok || health.mode === 'mock') && !isProcessing;

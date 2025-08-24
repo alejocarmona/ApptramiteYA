@@ -584,7 +584,7 @@ export default function TramiteFacil() {
                     tramiteName={selectedTramite.name}
                     price={selectedTramite.priceCop}
                     formData={formData}
-                    onPaymentSuccess={handlePaymentResult}
+                    onPaymentResult={handlePaymentResult}
                     onPaymentError={handlePaymentError}
                   />
                 }
