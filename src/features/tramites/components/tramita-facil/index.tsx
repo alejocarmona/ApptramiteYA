@@ -355,20 +355,9 @@ export default function TramiteFacil() {
   );
 
   const handlePay = useCallback(() => {
-    log('INFO', `Payment initiated. Is mock: ${isMock}`);
-
-    const reference = `MOCK-${uuidv4()}`;
-    log('INFO', 'Initiating MOCK payment with hardcoded success.', {reference});
-
-    // Directly call handlePaymentResult with a successful response for testing.
-    const result: PaymentResult = {
-      status: 'APPROVED',
-      reference: reference,
-      transactionId: `mock_tx_${uuidv4()}`,
-    };
-    handlePaymentResult(result);
-
-  }, [isMock, log, handlePaymentResult]);
+    log('DEBUG', 'handlePay called. Attempting to set status to generating.');
+    setFlowState(prev => ({...prev, status: 'generating', step: 4}));
+  }, [log]);
 
   const resetFlow = useCallback(() => {
     log('INFO', 'Resetting flow.');
@@ -462,12 +451,11 @@ export default function TramiteFacil() {
   // Main flow orchestrator effect
   useEffect(() => {
     const flowId = `${flowState.status}-${flowState.step}`;
-    log('INFO', `Flow updated: ${flowId}`, {currentField, isLiaTyping});
+    log('INFO', `Flow updated: ${flowId}`, {flowState});
 
     const lastMessage = messages[messages.length - 1];
     const isLiaTurn = !lastMessage || lastMessage.sender === 'user';
 
-    // Step 2: Filling form data
     if (
       flowState.status === 'filling' &&
       selectedTramite &&
@@ -478,7 +466,6 @@ export default function TramiteFacil() {
         currentField >= selectedTramite.dataRequirements.length;
 
       if (allFieldsFilled) {
-        log('INFO', 'All fields filled, moving to payment.');
         setFlowState(prev => ({...prev, step: 3, status: 'paying'}));
         return;
       }
@@ -510,34 +497,33 @@ export default function TramiteFacil() {
         setIsLiaTyping(false);
       }, 500);
     }
+    
+    if (flowState.status === 'paying' && selectedTramite) {
+       const lastMessageIsPayment =
+        lastMessage?.content &&
+        typeof lastMessage.content === 'object' &&
+        React.isValidElement(lastMessage.content) &&
+        lastMessage.content.type === Payment;
 
-    const lastMessageIsPayment =
-      lastMessage?.content &&
-      typeof lastMessage.content === 'object' &&
-      React.isValidElement(lastMessage.content) &&
-      lastMessage.content.type === Payment;
-    if (
-      flowState.status === 'paying' &&
-      selectedTramite &&
-      !lastMessageIsPayment
-    ) {
-      addMessage(
-        'lia',
-        <div className="flex items-center gap-2">
-          {' '}
-          <CheckCircle2 className="text-green-500" />{' '}
-          <span>¡Perfecto! Hemos reunido toda la información.</span>{' '}
-        </div>
-      );
-      addMessage(
-        'lia',
-        <Payment
-          tramiteName={selectedTramite.name}
-          price={selectedTramite.priceCop}
-          onPay={handlePay}
-          isProcessing={isProcessingPayment}
-        />
-      );
+      if (!lastMessageIsPayment) {
+        addMessage(
+          'lia',
+          <div className="flex items-center gap-2">
+            {' '}
+            <CheckCircle2 className="text-green-500" />{' '}
+            <span>¡Perfecto! Hemos reunido toda la información.</span>{' '}
+          </div>
+        );
+        addMessage(
+          'lia',
+          <Payment
+            tramiteName={selectedTramite.name}
+            price={selectedTramite.priceCop}
+            onPay={handlePay}
+            isProcessing={isProcessingPayment}
+          />
+        );
+      }
     }
     
     if (flowState.status === 'generating') {
@@ -548,28 +534,26 @@ export default function TramiteFacil() {
       return () => clearTimeout(timer);
     }
 
-    const lastMessageIsDownloader =
-      lastMessage?.content &&
-      typeof lastMessage.content === 'object' &&
-      React.isValidElement(lastMessage.content) &&
-      lastMessage.content.type === DocumentDownloader;
-    if (
-      flowState.status === 'completed' &&
-      selectedTramite &&
-      !lastMessageIsDownloader
-    ) {
-      addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
-      addMessage(
-        'lia',
-        <DocumentDownloader
-          tramiteName={selectedTramite.name}
-          onReset={resetFlow}
-        />
-      );
+    if (flowState.status === 'completed' && selectedTramite) {
+      const lastMessageIsDownloader =
+        lastMessage?.content &&
+        typeof lastMessage.content === 'object' &&
+        React.isValidElement(lastMessage.content) &&
+        lastMessage.content.type === DocumentDownloader;
+      
+      if (!lastMessageIsDownloader) {
+        addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
+        addMessage(
+          'lia',
+          <DocumentDownloader
+            tramiteName={selectedTramite.name}
+            onReset={resetFlow}
+          />
+        );
+      }
     }
   }, [
-    flowState.status,
-    flowState.step,
+    flowState,
     messages,
     selectedTramite,
     currentField,
@@ -654,7 +638,7 @@ export default function TramiteFacil() {
               handleCancelFlow(
                 flowState.status === 'paying'
                   ? 'payment_pending'
-                  : 'cancelled_by_user'
+                                    : 'cancelled_by_user'
               )
             }
             className={cn(buttonVariants({variant: 'destructive'}))}
