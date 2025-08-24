@@ -49,6 +49,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -277,61 +286,7 @@ export default function TramiteFacil() {
     },
     [log]
   );
-
-  const resetFlow = useCallback(() => {
-    log('INFO', 'Resetting flow.');
-    setFlowState(initialFlow);
-    setSelectedTramite(null);
-    setFormData({});
-    setCurrentField(0);
-    setIsLiaTyping(false);
-    setUserInput('');
-    setMessages([]);
-  }, [log]);
-
-  const handleTramiteSelect = useCallback(
-    (tramite: Tramite) => {
-      log('INFO', `Tramite selected: ${tramite.id}`);
-      setMessages(currentMessages => currentMessages.slice(0, 1));
-      addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
-      setSelectedTramite(tramite);
-      setCurrentField(0);
-      setFormData({});
-      setFlowState({
-        step: 2,
-        status: 'filling',
-        tramiteId: tramite.id,
-      });
-    },
-    [addMessage, log]
-  );
-
-  const startInitialFlow = useCallback(() => {
-    log('INFO', 'Starting initial flow.');
-    addMessage(
-      'lia',
-      <WelcomeHero
-        onStart={() =>
-          document
-            .getElementById('tramite-selector')
-            ?.scrollIntoView({behavior: 'smooth'})
-        }
-      />
-    );
-    addMessage(
-      'lia',
-      <div id="tramite-selector">
-        <TramiteSelector onSelect={handleTramiteSelect} />
-      </div>
-    );
-  }, [addMessage, log, handleTramiteSelect]);
-
-  useEffect(() => {
-    if (messages.length === 0) {
-      startInitialFlow();
-    }
-  }, [messages.length, startInitialFlow]);
-
+  
   const handlePaymentResult = useCallback(
     async (result: PaymentResult) => {
       setIsProcessingPayment(false);
@@ -376,7 +331,7 @@ export default function TramiteFacil() {
     },
     [addMessage, log]
   );
-  
+
   const handleMockResult = useCallback(
     (result: Omit<PaymentResult, 'reference'>) => {
       log('INFO', 'Received result from mock dialog.', {
@@ -393,29 +348,83 @@ export default function TramiteFacil() {
     },
     [currentMockReference, handlePaymentResult, log]
   );
-  
+
   const handlePay = useCallback(() => {
     if (isProcessingPayment) return;
-    
+
     log('INFO', `Payment initiated. Is mock: ${isMock}`);
     setIsProcessingPayment(true);
-    
+
     if (isMock) {
       const reference = `MOCK-${uuidv4()}`;
-      log('INFO', 'Initiating MOCK payment', { reference });
+      log('INFO', 'Initiating MOCK payment', {reference});
       setCurrentMockReference(reference);
       setIsMockModalOpen(true);
     } else {
       // Real payment logic would go here.
       log('WARN', 'Real payment provider not implemented.');
       setIsProcessingPayment(false);
-       toast({
+      toast({
         title: 'Servicio no disponible',
         description: 'La pasarela de pagos real no está implementada aún.',
         variant: 'destructive',
       });
     }
   }, [isMock, log, toast, isProcessingPayment]);
+
+  const resetFlow = useCallback(() => {
+    log('INFO', 'Resetting flow.');
+    setFlowState(initialFlow);
+    setSelectedTramite(null);
+    setFormData({});
+    setCurrentField(0);
+    setIsLiaTyping(false);
+    setUserInput('');
+    setMessages([]);
+  }, [log]);
+  
+  const handleTramiteSelect = useCallback(
+    (tramite: Tramite) => {
+      log('INFO', `Tramite selected: ${tramite.id}`);
+      setMessages(currentMessages => currentMessages.slice(0, 1));
+      addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
+      setSelectedTramite(tramite);
+      setCurrentField(0);
+      setFormData({});
+      setFlowState({
+        step: 2,
+        status: 'filling',
+        tramiteId: tramite.id,
+      });
+    },
+    [addMessage, log]
+  );
+
+  const startInitialFlow = useCallback(() => {
+    log('INFO', 'Starting initial flow.');
+    addMessage(
+      'lia',
+      <WelcomeHero
+        onStart={() =>
+          document
+            .getElementById('tramite-selector')
+            ?.scrollIntoView({behavior: 'smooth'})
+        }
+      />
+    );
+    addMessage(
+      'lia',
+      <div id="tramite-selector">
+        <TramiteSelector onSelect={handleTramiteSelect} />
+      </div>
+    );
+  }, [addMessage, log, handleTramiteSelect]);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      startInitialFlow();
+    }
+  }, [messages.length, startInitialFlow]);
 
   const handleCancelFlow = useCallback(
     async (reason?: string) => {
@@ -669,15 +678,15 @@ export default function TramiteFacil() {
 
   return (
     <>
-      <AlertDialog open={isMockModalOpen} onOpenChange={setIsMockModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Mock de Pago</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={isMockModalOpen} onOpenChange={setIsMockModalOpen}>
+        <DialogContent onEscapeKeyDown={handleMockClose} onPointerDownOutside={handleMockClose}>
+          <DialogHeader>
+            <DialogTitle>Mock de Pago</DialogTitle>
+            <DialogDescription>
               Este es un simulador de pagos. Selecciona un resultado para
               continuar con el flujo.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex flex-col space-y-2 py-4">
             {mockOptions.map(option => (
               <Button
@@ -698,11 +707,13 @@ export default function TramiteFacil() {
               </Button>
             ))}
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleMockClose}>Cerrar</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+           <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" onClick={handleMockClose}>Cerrar</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card
         className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl"
@@ -810,3 +821,5 @@ export default function TramiteFacil() {
     </>
   );
 }
+
+    
