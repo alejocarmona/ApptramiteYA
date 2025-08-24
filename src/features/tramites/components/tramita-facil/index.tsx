@@ -63,7 +63,7 @@ import {usePayment} from '@/features/payments/provider';
 import {useAppLogger} from '@/lib/logger';
 import { v4 as uuidv4 } from 'uuid';
 import type { PaymentResult } from '@/types/payment';
-import { useMockProvider } from '@/features/payments/mock';
+import PaymentMockDialog from '@/components/payments/PaymentMock';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -231,6 +231,10 @@ export default function TramiteFacil() {
   const [isLiaTyping, setIsLiaTyping] = useState<boolean>(false);
   const [userInput, setUserInput] = useState('');
   
+  // State for mock payment modal
+  const [isMockModalOpen, setIsMockModalOpen] = useState(false);
+  const [currentMockReference, setCurrentMockReference] = useState<string | null>(null);
+
   const {log} = useAppLogger('TramiteFacil');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
@@ -241,10 +245,9 @@ export default function TramiteFacil() {
     log('INFO', `Adding message from ${sender}`, {id: newMessage.id});
     setMessages(prev => [...prev, newMessage]);
   }, [log]);
-  
+
   const handleTramiteSelect = useCallback((tramite: Tramite) => {
     log('INFO', `Tramite selected: ${tramite.id}`);
-    // Clear all messages except the very first one (the welcome hero)
     setMessages(currentMessages => currentMessages.slice(0, 1));
     addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
     setSelectedTramite(tramite);
@@ -259,7 +262,6 @@ export default function TramiteFacil() {
 
   const startInitialFlow = useCallback(() => {
     log('INFO', 'Starting initial flow.');
-    setMessages([]);
     addMessage(
       'lia',
       <WelcomeHero
@@ -284,10 +286,10 @@ export default function TramiteFacil() {
     setCurrentField(0);
     setIsLiaTyping(false);
     setUserInput('');
+    setMessages([]);
     startInitialFlow();
   }, [startInitialFlow, log]);
-
-
+  
   const handlePaymentResult = useCallback(async (result: PaymentResult) => {
     log('INFO', 'Received payment result in main component.', {result});
     await logPaymentEvent(result);
@@ -313,14 +315,43 @@ export default function TramiteFacil() {
       addMessage('lia', content[result.status] || content['ERROR']);
     }
   }, [addMessage, log]);
-  
-  const { showMockModal, MockModalPortal } = useMockProvider({ onResult: handlePaymentResult });
 
+  const showMockModal = useCallback((reference: string) => {
+    log('INFO', 'Showing mock payment modal.', { reference });
+    setCurrentMockReference(reference);
+    setIsMockModalOpen(true);
+  }, [log]);
+  
   const {initiatePayment, isProcessingPayment} = usePayment({
     onSuccess: handlePaymentResult,
     onError: handlePaymentResult,
     showMockModal,
   });
+  
+  const handleMockResult = useCallback((result: Omit<PaymentResult, 'reference'>) => {
+    if (currentMockReference) {
+      log('INFO', 'Received result from mock dialog.', { result, reference: currentMockReference });
+      handlePaymentResult({ ...result, reference: currentMockReference });
+    } else {
+      log('ERROR', 'Received result from mock but no reference was set.');
+    }
+    setIsMockModalOpen(false);
+    setCurrentMockReference(null);
+  }, [currentMockReference, handlePaymentResult, log]);
+
+  const handleMockClose = useCallback(() => {
+    log('INFO', 'Mock modal closed by user.');
+    setIsMockModalOpen(false);
+    if (currentMockReference) {
+       handlePaymentResult({
+          status: 'CANCELLED',
+          reference: currentMockReference,
+          transactionId: `mock_${Math.random().toString(36).slice(2, 10)}`,
+          reason: 'Pago cancelado por el usuario'
+       });
+    }
+    setCurrentMockReference(null);
+  }, [currentMockReference, handlePaymentResult, log]);
 
   const handleCancelFlow = useCallback(async (reason?: string) => {
     log('WARN', `Flow cancellation requested. Reason: ${reason}`, {
@@ -392,7 +423,6 @@ export default function TramiteFacil() {
     // Step 3: Waiting for payment
     if (flowState.status === 'paying' && selectedTramite) {
       const lastMessageContent = messages[messages.length - 1]?.content;
-      // Ensure we only add the payment component once
       if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === Payment) {
         return; 
       }
@@ -417,7 +447,7 @@ export default function TramiteFacil() {
     if (flowState.status === 'generating') {
       const lastMessageContent = messages[messages.length - 1]?.content;
       if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === DocumentGenerationProgress) {
-        return; // Already showing progress
+        return;
       }
       addMessage('lia', <DocumentGenerationProgress />);
       
@@ -431,7 +461,7 @@ export default function TramiteFacil() {
     if (flowState.status === 'completed' && selectedTramite) {
        const lastMessageContent = messages[messages.length - 1]?.content;
        if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === DocumentDownloader) {
-          return; // Already shown
+          return;
        }
         addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
         addMessage('lia', <DocumentDownloader tramiteName={selectedTramite.name} onReset={resetFlow} />);
@@ -452,7 +482,6 @@ export default function TramiteFacil() {
     formData,
   ]);
 
-  // Effect to run only once on mount
   useEffect(() => {
     startInitialFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -528,18 +557,19 @@ export default function TramiteFacil() {
   );
   
   const getVisibleMessages = () => {
-    // In step 1, show only the first two messages (Welcome + Selector)
     if (flowState.step === 1) {
         return messages.slice(0, 2);
     }
-    // After step 1, hide the welcome message but keep the selector if needed or just the flow.
-    // This logic ensures the initial components don't reappear incorrectly.
     return messages.slice(1);
   };
 
   return (
     <>
-      <MockModalPortal />
+      <PaymentMockDialog
+        open={isMockModalOpen}
+        onClose={handleMockClose}
+        onResult={handleMockResult}
+      />
       <Card
         className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl"
         style={{paddingBottom: keyboardPadding}}
@@ -648,5 +678,3 @@ export default function TramiteFacil() {
     </>
   );
 }
-
-    

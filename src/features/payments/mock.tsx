@@ -1,6 +1,10 @@
 
 'use client';
 
+// This file is deprecated and its logic has been moved to the `TramiteFacil` component.
+// It is kept for reference during the refactoring but can be safely deleted afterward.
+// The `useMockProvider` hook is no longer in use.
+
 import { useState, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import PaymentMockDialog from '@/components/payments/PaymentMock';
@@ -14,7 +18,7 @@ type UseMockProviderProps = {
 export function useMockProvider({ onResult }: UseMockProviderProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentReference, setCurrentReference] = useState<string | null>(null);
-  const { log } = useAppLogger('MockProvider');
+  const { log } = useAppLogger('MockProvider-DEPRECATED');
 
   const showMockModal = useCallback((reference: string) => {
     log('INFO', 'Showing mock payment modal.', { reference });
@@ -48,7 +52,7 @@ export function useMockProvider({ onResult }: UseMockProviderProps) {
   }, [currentReference, onResult, log]);
 
   const MockModalPortal = useCallback(() => {
-    if (typeof document === 'undefined') return null; // Guard for SSR
+    if (typeof document === 'undefined') return null;
     
     const portalRoot = document.getElementById('mock-payment-portal-root');
     if (!portalRoot) {
