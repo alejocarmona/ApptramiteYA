@@ -286,7 +286,7 @@ export default function TramiteFacil() {
     },
     [log]
   );
-  
+
   const handlePaymentResult = useCallback(
     async (result: PaymentResult) => {
       setIsProcessingPayment(false);
@@ -357,9 +357,18 @@ export default function TramiteFacil() {
 
     if (isMock) {
       const reference = `MOCK-${uuidv4()}`;
-      log('INFO', 'Initiating MOCK payment', {reference});
-      setCurrentMockReference(reference);
-      setIsMockModalOpen(true);
+      log('INFO', 'Initiating MOCK payment with hardcoded success.', {reference});
+      
+      // Directly call handlePaymentResult with a successful response for testing.
+      handlePaymentResult({
+        status: 'APPROVED',
+        reference: reference,
+        transactionId: `mock_tx_${uuidv4()}`,
+      });
+
+      // The original modal logic is commented out for the test.
+      // setCurrentMockReference(reference);
+      // setIsMockModalOpen(true);
     } else {
       // Real payment logic would go here.
       log('WARN', 'Real payment provider not implemented.');
@@ -370,7 +379,7 @@ export default function TramiteFacil() {
         variant: 'destructive',
       });
     }
-  }, [isMock, log, toast, isProcessingPayment]);
+  }, [isMock, log, toast, isProcessingPayment, handlePaymentResult]);
 
   const resetFlow = useCallback(() => {
     log('INFO', 'Resetting flow.');
@@ -382,7 +391,7 @@ export default function TramiteFacil() {
     setUserInput('');
     setMessages([]);
   }, [log]);
-  
+
   const handleTramiteSelect = useCallback(
     (tramite: Tramite) => {
       log('INFO', `Tramite selected: ${tramite.id}`);
@@ -518,7 +527,11 @@ export default function TramiteFacil() {
       typeof lastMessage.content === 'object' &&
       React.isValidElement(lastMessage.content) &&
       lastMessage.content.type === Payment;
-    if (flowState.status === 'paying' && selectedTramite && !lastMessageIsPayment) {
+    if (
+      flowState.status === 'paying' &&
+      selectedTramite &&
+      !lastMessageIsPayment
+    ) {
       addMessage(
         'lia',
         <div className="flex items-center gap-2">
@@ -679,7 +692,10 @@ export default function TramiteFacil() {
   return (
     <>
       <Dialog open={isMockModalOpen} onOpenChange={setIsMockModalOpen}>
-        <DialogContent onEscapeKeyDown={handleMockClose} onPointerDownOutside={handleMockClose}>
+        <DialogContent
+          onEscapeKeyDown={handleMockClose}
+          onPointerDownOutside={handleMockClose}
+        >
           <DialogHeader>
             <DialogTitle>Mock de Pago</DialogTitle>
             <DialogDescription>
@@ -707,9 +723,11 @@ export default function TramiteFacil() {
               </Button>
             ))}
           </div>
-           <DialogFooter>
+          <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline" onClick={handleMockClose}>Cerrar</Button>
+              <Button variant="outline" onClick={handleMockClose}>
+                Cerrar
+              </Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
