@@ -32,6 +32,7 @@ import {useToast} from '@/hooks/use-toast';
 import ChatBubble from '../ChatBubble';
 import TramiteSelector from '../TramiteSelector';
 import Payment from '../Payment';
+import PaymentMock from '@/components/payments/PaymentMock';
 import DocumentDownloader from '../DocumentDownloader';
 import AdaptiveStepper from './AdaptiveStepper';
 import {Progress} from '@/components/ui/progress';
@@ -66,6 +67,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
 import type { PaymentResult } from '@/types/payment';
+import { usePaymentMock } from '@/lib/flags';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -237,6 +239,9 @@ export default function TramiteFacil() {
   const [currentField, setCurrentField] = useState<number>(0);
   const [isLiaTyping, setIsLiaTyping] = useState<boolean>(false);
   const [userInput, setUserInput] = useState('');
+  const [showMockModal, setShowMockModal] = useState(false);
+  const isMockEnabled = usePaymentMock();
+
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
@@ -474,6 +479,7 @@ export default function TramiteFacil() {
   }, [addMessage, flowState.transactionId, resetFlow]);
   
   const handlePaymentResult = useCallback(async (result: PaymentResult) => {
+    setShowMockModal(false);
     // This is the orchestrator. It ensures operations happen in sequence.
     await logPaymentEvent(result);
     setFlowState((prev) => ({ ...prev, transactionId: result.reference }));
@@ -494,13 +500,16 @@ export default function TramiteFacil() {
     }
   }, [addMessage, handlePaymentSuccess]);
 
-  const handlePaymentError = (message: string) => {
-    toast({
-        title: 'Error de Pago',
-        description: message,
-        variant: 'destructive',
-    });
+  const handlePayClick = () => {
+    setIsLiaTyping(true); // Visually disable the pay button
+    if (isMockEnabled) {
+      setShowMockModal(true);
+    } else {
+      // Real payment logic would go here
+      console.log("Initiating real payment flow...");
+    }
   };
+
 
   const currentStep = flowState.step;
 
@@ -569,9 +578,8 @@ export default function TramiteFacil() {
                     <Payment
                         tramiteName={selectedTramite.name}
                         price={selectedTramite.priceCop}
-                        formData={formData}
-                        onPaymentResult={handlePaymentResult}
-                        onPaymentError={handlePaymentError}
+                        onPay={handlePayClick}
+                        isProcessing={isLiaTyping}
                     />
                     }
                 />
@@ -589,6 +597,16 @@ export default function TramiteFacil() {
                 )}
             </div>
         </ScrollArea>
+        {showMockModal && (
+          <PaymentMock 
+            open={showMockModal}
+            onClose={() => {
+              setShowMockModal(false);
+              setIsLiaTyping(false); // Re-enable pay button
+            }}
+            onResult={handlePaymentResult}
+          />
+        )}
       </CardContent>
 
       <div

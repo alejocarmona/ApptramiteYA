@@ -1,6 +1,5 @@
 'use client';
 
-import {useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {
   CreditCard,
@@ -13,52 +12,22 @@ import {
 } from 'lucide-react';
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
-import PaymentMock from '@/components/payments/PaymentMock';
 import {usePaymentMock} from '@/lib/flags';
-import type {PaymentResult} from '@/types/payment';
 
 type PaymentProps = {
   price: number;
   tramiteName: string;
-  onPaymentResult: (result: PaymentResult) => void;
+  onPay: () => void; // Changed from onPaymentResult
+  isProcessing: boolean;
 };
 
 export default function Payment({
   price,
   tramiteName,
-  onPaymentResult,
+  onPay,
+  isProcessing,
 }: PaymentProps) {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showMockModal, setShowMockModal] = useState(false);
   const isMockEnabled = usePaymentMock();
-
-  const handlePayment = () => {
-    setIsProcessing(true);
-    if (isMockEnabled) {
-      setShowMockModal(true);
-    } else {
-      // Real payment logic would go here.
-      // For now, we simulate an error if mock is disabled.
-      onPaymentResult({
-        status: 'ERROR',
-        reference: `error_${Date.now()}`,
-        transactionId: `err_${Math.random().toString(36).slice(2, 9)}`,
-        reason: 'El servicio de pago real no está habilitado.',
-      });
-      setIsProcessing(false);
-    }
-  };
-
-  const handleMockResult = (result: PaymentResult) => {
-    setShowMockModal(false);
-    setIsProcessing(false);
-    onPaymentResult(result);
-  };
-
-  const handleMockClose = () => {
-    setShowMockModal(false);
-    setIsProcessing(false);
-  };
 
   const serviceFee = 2500;
   const iva = (price + serviceFee) * 0.19;
@@ -125,7 +94,7 @@ export default function Payment({
 
       <div className="pt-2">
         <Button
-          onClick={handlePayment}
+          onClick={onPay}
           disabled={isProcessing}
           className="h-12 w-full bg-green-500 text-base text-white transition-all hover:bg-green-600 hover:scale-105"
           size="lg"
@@ -163,11 +132,6 @@ export default function Payment({
           <span>Soporte 24/7</span>
         </div>
       </div>
-      <PaymentMock
-        open={showMockModal}
-        onClose={handleMockClose}
-        onResult={handleMockResult}
-      />
     </div>
   );
 }
