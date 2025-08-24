@@ -18,9 +18,11 @@ import {Separator} from '@/components/ui/separator';
 import {useToast} from '@/hooks/use-toast';
 import PaymentMock from '@/components/payments/PaymentMock';
 import { usePaymentMock, fallbackToMockOnHealthFail } from '@/lib/flags';
-import { startPayment } from '@/services/payments';
 import type { PaymentResult, PaymentInput } from '@/types/payment';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { httpsCallable, Functions } from 'firebase/functions';
+import { getFirebaseFunctions } from '@/lib/firebase';
+
 
 type HealthState = {
   mode: 'real' | 'mock';
@@ -36,6 +38,79 @@ type PaymentProps = {
   onPaymentResult: (result: PaymentResult) => void;
   onPaymentError: (message: string) => void;
 };
+
+let functions: Functions;
+try {
+  functions = getFirebaseFunctions();
+} catch (error) {
+  console.error("Could not initialize Firebase Functions:", error);
+}
+
+const startWompiPayment = async (input: PaymentInput): Promise<PaymentResult> => {
+    if (!functions) {
+        throw new Error('El servicio de pagos no está disponible en este momento.');
+    }
+
+    if (input.healthCheck) {
+        const wompiHealth = httpsCallable(functions, 'wompiHealth');
+        await wompiHealth();
+        return { status: 'APPROVED', reference: 'health-check', transactionId: 'health-check' }; // Dummy result
+    }
+
+    const createWompiTransaction = httpsCallable(functions, 'createWompiTransaction');
+    
+    try {
+        const result: any = await createWompiTransaction({
+            tramiteName: input.tramiteName,
+            amountInCents: input.amountInCents,
+            currency: 'COP',
+            reference: input.reference,
+            formData: input.formData,
+            paymentMethod: {
+                type: 'CARD', // This is a placeholder
+                installments: 1,
+            },
+        });
+
+        if (result.data.ok && result.data.transactionId) {
+            // In a real scenario with a redirect, this part would be different.
+            // Here, we simulate an immediate approval after creation for flow continuation.
+            return {
+                status: 'APPROVED',
+                reference: result.data.transactionId,
+                transactionId: result.data.wompiTransaction.id,
+            };
+        } else {
+            throw new Error(result.data.error || 'Respuesta inesperada del servidor.');
+        }
+    } catch (error: any) {
+        console.error('Wompi payment failed:', error);
+
+        let description = 'Ocurrió un error desconocido al procesar el pago.';
+        if (error.code && error.message) {
+            const details = error.details as any;
+            const requestId = details?.requestId;
+
+            switch (error.code) {
+                case 'invalid-argument':
+                    description = 'Por favor, revisa los datos del pago e intenta de nuevo.';
+                    break;
+                case 'failed-precondition':
+                    if (error.message === 'missing_wompi_private' || error.message === 'missing_config') {
+                        description = 'El servicio de pago no está disponible temporalmente. Intenta más tarde.';
+                    } else if (error.message === 'wompi_error') {
+                        description = `No pudimos crear la transacción (código ${details?.status}). Intenta de nuevo.`;
+                    }
+                    break;
+                case 'internal':
+                    description = `Ocurrió un error inesperado. Si persiste, contacta a soporte. (ID: ${requestId || 'N/A'})`;
+                    break;
+            }
+        }
+        throw new Error(description);
+    }
+};
+
 
 export default function Payment({
   price,
@@ -62,7 +137,7 @@ export default function Payment({
 
     const checkHealth = async () => {
       try {
-          await startPayment({ healthCheck: true });
+          await startWompiPayment({ healthCheck: true } as PaymentInput);
           setHealth({ mode: 'real', ok: true, error: null, checked: true });
       } catch (error: any) {
           console.error('Payment service health check failed:', error);
@@ -103,7 +178,7 @@ export default function Payment({
     };
 
     try {
-      const result = await startPayment(paymentInput);
+      const result = await startWompiPayment(paymentInput);
       onPaymentResult(result);
     } catch (error: any) {
        onPaymentError(error.message || 'Ocurrió un error desconocido.');
@@ -240,3 +315,5 @@ export default function Payment({
     </div>
   );
 }
+
+    
