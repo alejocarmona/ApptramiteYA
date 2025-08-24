@@ -288,7 +288,7 @@ export default function TramiteFacil() {
     setIsLiaTyping(false);
     setUserInput('');
     setMessages([]);
-  }, []);
+  }, [log]);
   
   useEffect(() => {
     if (messages.length === 0) {
@@ -322,32 +322,18 @@ export default function TramiteFacil() {
       addMessage('lia', content[result.status] || content['ERROR']);
     }
   }, [addMessage, log]);
-  
-  const handleMockResult = useCallback((result: Omit<PaymentResult, 'reference'>) => {
+
+  const handleMockResult = (result: Omit<PaymentResult, 'reference'>) => {
+    log('INFO', 'Received result from mock dialog.', {result});
     if (currentMockReference) {
-      log('INFO', 'Received result from mock dialog.', { result, reference: currentMockReference });
-      handlePaymentResult({ ...result, reference: currentMockReference });
+      handlePaymentResult({...result, reference: currentMockReference});
     } else {
-      log('ERROR', 'Received result from mock but no reference was set.');
+      log('ERROR', 'Mock result received but no reference was stored.');
     }
     setIsMockModalOpen(false);
     setCurrentMockReference(null);
-  }, [currentMockReference, handlePaymentResult, log]);
-
-  const handleMockClose = useCallback(() => {
-    log('INFO', 'Mock modal closed by user.');
-    setIsMockModalOpen(false);
-    if (currentMockReference) {
-       handlePaymentResult({
-          status: 'CANCELLED',
-          reference: currentMockReference,
-          transactionId: `mock_${Math.random().toString(36).slice(2, 10)}`,
-          reason: 'Pago cancelado por el usuario'
-       });
-    }
-    setCurrentMockReference(null);
-  }, [currentMockReference, handlePaymentResult, log]);
-
+  };
+  
   const handlePay = useCallback(() => {
     if (!selectedTramite) return;
     
@@ -402,7 +388,7 @@ export default function TramiteFacil() {
     setUserInput('');
     setCurrentField(prev => prev + 1);
   };
-  
+
   // Main flow orchestrator effect
   useEffect(() => {
     const flowId = `${flowState.status}-${flowState.step}`;
@@ -487,6 +473,19 @@ export default function TramiteFacil() {
     }
   }, [messages]);
 
+  const handleMockClose = () => {
+    log('INFO', 'Mock modal closed by user.');
+    setIsMockModalOpen(false);
+    if (currentMockReference) {
+      handlePaymentResult({
+        status: 'CANCELLED',
+        reference: currentMockReference,
+        transactionId: `mock_${Math.random().toString(36).slice(2, 10)}`,
+        reason: 'Pago cancelado por el usuario',
+      });
+    }
+    setCurrentMockReference(null);
+  };
 
   const OverflowMenu = () => (
     <AlertDialog>
@@ -669,5 +668,3 @@ export default function TramiteFacil() {
     </>
   );
 }
-
-    
