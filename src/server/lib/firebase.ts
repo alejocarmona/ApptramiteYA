@@ -20,11 +20,10 @@ if (!apps.length) {
     app = initializeApp({credential: cert(serviceAccount)});
   } else {
     console.warn(
-      'Firebase Admin SDK not initialized. Missing FIREBASE_PRIVATE_KEY or FIREBASE_CLIENT_EMAIL.'
+      'Firebase Admin SDK credentials not found. Initializing with default settings for local development.'
     );
     // In a development environment without service account credentials,
-    // we can initialize a default app instance to avoid crashes,
-    // but server-side Firebase services will not be authenticated.
+    // we can initialize a default app instance to avoid crashes.
     app = initializeApp();
   }
 } else {
