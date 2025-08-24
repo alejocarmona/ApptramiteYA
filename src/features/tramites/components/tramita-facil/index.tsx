@@ -275,7 +275,7 @@ export default function TramiteFacil() {
             id: getUniqueMessageId(),
         }
     ]);
-  }, [addMessage]);
+  }, []);
 
   const handleTramiteSelect = useCallback(
     (tramite: Tramite, isNewFlow = false) => {
@@ -376,7 +376,7 @@ export default function TramiteFacil() {
 
   useEffect(() => {
     resetFlow();
-  }, []);
+  }, [resetFlow]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -484,17 +484,14 @@ export default function TramiteFacil() {
       });
     }
 
-    setTimeout(() => {
-      addMessage('lia', <DocumentGenerationProgress />);
-      setTimeout(async () => {
-        if (flowState.transactionId) {
-          await markTransactionAsDelivered(flowState.transactionId);
-        }
-        setFlowState((prev) => ({...prev, step: 4, status: 'completed'}));
-        setIsLiaTyping(false);
-        addMessage('lia', <SuccessCelebration onReset={() => resetFlow()} />);
-      }, 7000);
-    }, 500);
+    setTimeout(async () => {
+      if (flowState.transactionId) {
+        await markTransactionAsDelivered(flowState.transactionId);
+      }
+      setFlowState((prev) => ({...prev, step: 4, status: 'completed'}));
+      setIsLiaTyping(false);
+      addMessage('lia', <SuccessCelebration onReset={() => resetFlow()} />);
+    }, 7000);
   };
 
   const handlePaymentResult = async (result: PaymentResult) => {
@@ -503,7 +500,7 @@ export default function TramiteFacil() {
 
     switch (result.status) {
       case 'APPROVED':
-        handlePaymentSuccess();
+        await handlePaymentSuccess();
         break;
       case 'DECLINED':
         addMessage('lia', <div className="flex items-center gap-2"><AlertTriangle className="text-amber-500" /><span>Pago rechazado: {result.reason}</span></div>);
