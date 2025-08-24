@@ -1,3 +1,4 @@
+
 export type PaymentStatus =
   | "APPROVED"
   | "DECLINED"
@@ -12,10 +13,9 @@ export type PaymentResult = {
 };
 
 export type PaymentInput = {
+    tramiteId: string;
     tramiteName: string;
     amountInCents: number;
     currency: 'COP';
     formData: Record<string, string>;
-    reference: string;
-    healthCheck?: boolean;
 }

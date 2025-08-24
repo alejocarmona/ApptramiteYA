@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -10,13 +11,13 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { PaymentResult } from "@/types/payment";
+import type { PaymentResult } from "@/types/payment";
 import { CheckCircle, XCircle, AlertTriangle, Ban } from "lucide-react";
 
 type PaymentMockProps = {
   open: boolean;
   onClose: () => void;
-  onResult: (result: PaymentResult) => void;
+  onResult: (result: Omit<PaymentResult, 'reference'>) => void;
 };
 
 const mockOptions = [
@@ -45,19 +46,21 @@ const mockOptions = [
   },
 ] as const;
 
-export default function PaymentMock({
+export default function PaymentMockDialog({
   open,
   onClose,
   onResult,
 }: PaymentMockProps) {
   const handleSelect = (option: (typeof mockOptions)[number]) => {
-    const result: PaymentResult = {
+    const result: Omit<PaymentResult, 'reference'> = {
       status: option.status,
-      reference: `order_${Date.now()}`,
       transactionId: `mock_${Math.random().toString(36).slice(2, 10)}`,
       ...(option.reason && { reason: option.reason }),
     };
     onResult(result);
+  };
+  
+  const handleCancel = () => {
     onClose();
   };
 
@@ -92,7 +95,7 @@ export default function PaymentMock({
           ))}
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>Cerrar</AlertDialogCancel>
+          <AlertDialogCancel onClick={handleCancel}>Cerrar</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
