@@ -426,34 +426,23 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage]);
 
   useEffect(() => {
-    if (
-      flowState.status !== 'filling' ||
-      isLiaTyping ||
-      !selectedTramite
-    ) {
+    if (flowState.status !== 'filling' || isLiaTyping || !selectedTramite) {
       return;
     }
-
+  
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return;
-
-    const isFirstQuestion =
-      currentField === 0 &&
-      lastMessage.sender === 'lia' &&
-      (lastMessage.content as React.ReactElement)?.props?.children?.[0]?.props
-        ?.children === '¡Excelente elección!';
-
-    if (lastMessage.sender === 'user' || isFirstQuestion) {
+  
+    const isReadyForNextQuestion =
+      lastMessage.sender === 'user' ||
+      (lastMessage.sender === 'lia' &&
+        (lastMessage.content as React.ReactElement)?.props?.children?.[0]
+          ?.props?.children === '¡Excelente elección!');
+  
+    if (isReadyForNextQuestion) {
       askNextQuestion();
     }
-  }, [
-    flowState.status,
-    isLiaTyping,
-    messages,
-    selectedTramite,
-    currentField,
-    askNextQuestion,
-  ]);
+  }, [flowState.status, isLiaTyping, messages, askNextQuestion, selectedTramite]);
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -491,8 +480,7 @@ export default function TramiteFacil() {
         <span>Pago aprobado. ¡Gracias!</span>
       </div>
     );
-    setFlowState((prev) => ({...prev, status: 'generating'}));
-
+    
     // Simulate API call to mark transaction as paid in our DB
     if (flowState.transactionId) {
       await markTransactionAsPaid(
@@ -500,13 +488,14 @@ export default function TramiteFacil() {
         `wompi_${Date.now()}`
       );
     }
-
+    setFlowState((prev) => ({...prev, step: 4, status: 'generating'}));
+    
     // Simulate document generation delay
     setTimeout(async () => {
       if (flowState.transactionId) {
         await markTransactionAsDelivered(flowState.transactionId);
       }
-      setFlowState((prev) => ({...prev, step: 4, status: 'completed'}));
+      setFlowState((prev) => ({...prev, status: 'completed'}));
       addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
     }, 7000);
   }, [addMessage, flowState.transactionId, resetFlow]);
@@ -557,7 +546,6 @@ export default function TramiteFacil() {
 
   const handlePayClick = () => {
     setIsProcessingPayment(true);
-    // Simulate API call or some async work before showing the modal
     setTimeout(() => {
       if (isMockEnabled) {
         setShowMockModal(true);
@@ -565,7 +553,7 @@ export default function TramiteFacil() {
         // Real payment logic would go here
         console.log('Initiating real payment...');
       }
-    }, 500); // Short delay to simulate processing
+    }, 500); 
   };
 
   const getVisibleMessages = () => {
