@@ -68,6 +68,14 @@ type Message = {
   id: number;
 };
 
+// Simple unique ID generator to prevent key collisions
+let messageIdCounter = 0;
+const getUniqueMessageId = () => {
+  messageIdCounter += 1;
+  return Date.now() + messageIdCounter;
+};
+
+
 function DocumentGenerationProgress() {
   const [progress, setProgress] = useState(10);
   const [progressText, setProgressText] = useState('Preparando...');
@@ -234,7 +242,7 @@ export default function TramiteFacil() {
 
   const addMessage = useCallback(
     (sender: 'user' | 'lia', content: React.ReactNode) => {
-      setMessages((prev) => [...prev, {sender, content, id: Date.now()}]);
+      setMessages((prev) => [...prev, {sender, content, id: getUniqueMessageId()}]);
     },
     []
   );
@@ -621,5 +629,3 @@ export default function TramiteFacil() {
     </Card>
   );
 }
-
-    
