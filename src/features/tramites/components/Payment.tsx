@@ -21,29 +21,30 @@ type PaymentProps = {
   price: number;
   tramiteName: string;
   onPaymentResult: (result: PaymentResult) => void;
-  onPaymentError: (message: string) => void;
 };
 
 export default function Payment({
   price,
   tramiteName,
   onPaymentResult,
-  onPaymentError,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
-
   const isMockEnabled = usePaymentMock();
 
   const handlePayment = () => {
     setIsProcessing(true);
-
     if (isMockEnabled) {
       setShowMockModal(true);
     } else {
-      onPaymentError(
-        'El servicio de pago real no está implementado en este momento.'
-      );
+      // Real payment logic would go here.
+      // For now, we simulate an error if mock is disabled.
+      onPaymentResult({
+        status: 'ERROR',
+        reference: `error_${Date.now()}`,
+        transactionId: `err_${Math.random().toString(36).slice(2, 9)}`,
+        reason: 'El servicio de pago real no está habilitado.',
+      });
       setIsProcessing(false);
     }
   };
@@ -52,6 +53,11 @@ export default function Payment({
     setShowMockModal(false);
     setIsProcessing(false);
     onPaymentResult(result);
+  };
+
+  const handleMockClose = () => {
+    setShowMockModal(false);
+    setIsProcessing(false);
   };
 
   const serviceFee = 2500;
@@ -159,10 +165,7 @@ export default function Payment({
       </div>
       <PaymentMock
         open={showMockModal}
-        onClose={() => {
-          setShowMockModal(false);
-          setIsProcessing(false);
-        }}
+        onClose={handleMockClose}
         onResult={handleMockResult}
       />
     </div>
