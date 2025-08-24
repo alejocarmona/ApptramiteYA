@@ -143,6 +143,11 @@ export default function Payment({
       <h3 className="text-center text-lg font-bold text-foreground">
         Resumen de tu pago
       </h3>
+      <div className="text-center">
+        <Badge variant="secondary">
+          Modo de pago: {health.mode === 'mock' ? 'Simulado' : 'Real (Wompi)'}
+        </Badge>
+      </div>
       <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Trámite: {tramiteName}</span>
