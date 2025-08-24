@@ -11,14 +11,23 @@ import {
   Shield,
   ShieldCheck,
   FlaskConical,
+  AlertTriangle,
 } from 'lucide-react';
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
 import {useToast} from '@/hooks/use-toast';
 import PaymentMock from '@/components/payments/PaymentMock';
-import { usePaymentMock } from '@/lib/flags';
+import { usePaymentMock, fallbackToMockOnHealthFail } from '@/lib/flags';
 import { startPayment } from '@/services/payments';
 import type { PaymentResult, PaymentInput } from '@/types/payment';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+type HealthState = {
+  mode: 'real' | 'mock';
+  ok: boolean;
+  error: string | null;
+  checked: boolean;
+};
 
 type PaymentProps = {
   price: number;
@@ -36,43 +45,47 @@ export default function Payment({
   onPaymentError,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isHealthChecked, setIsHealthChecked] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
+  const [health, setHealth] = useState<HealthState>({ mode: 'real', ok: false, error: null, checked: false });
 
   const {toast} = useToast();
-  const isMockEnabled = usePaymentMock();
+  const isMockEnabledByFlag = usePaymentMock();
 
   useEffect(() => {
-    // Health check is only needed for real payments
-    if (!isMockEnabled && !isHealthChecked) {
-      const checkHealth = async () => {
-        try {
-            await startPayment({ healthCheck: true });
-            setIsHealthChecked(true);
-        } catch (error: any) {
-            console.error('Payment service health check failed:', error);
-            toast({
-                title: 'Servicio no disponible',
-                description: `El sistema de pagos no está configurado correctamente. Por favor, intenta más tarde.`,
-                variant: 'destructive',
-            });
-        }
-      };
-      checkHealth();
+    // Reset health check state when component mounts or flow restarts
+    setHealth({ mode: 'real', ok: false, error: null, checked: false });
+
+    if (isMockEnabledByFlag) {
+      setHealth({ mode: 'mock', ok: true, error: null, checked: true });
+      return;
     }
-  }, [isMockEnabled, isHealthChecked, toast]);
+
+    const checkHealth = async () => {
+      try {
+          await startPayment({ healthCheck: true });
+          setHealth({ mode: 'real', ok: true, error: null, checked: true });
+      } catch (error: any) {
+          console.error('Payment service health check failed:', error);
+          if (fallbackToMockOnHealthFail()) {
+            setHealth({ mode: 'mock', ok: true, error: null, checked: true });
+            toast({
+                title: 'Modo de prueba activado',
+                description: `El servicio de pago real no está disponible. Se usará el modo simulado.`,
+                variant: 'default',
+            });
+          } else {
+            setHealth({ mode: 'real', ok: false, error: `El sistema de pagos no está configurado correctamente. Por favor, intenta más tarde.`, checked: true });
+          }
+      }
+    };
+    checkHealth();
+  }, [isMockEnabledByFlag, toast, tramiteName]); // Depend on tramiteName to re-run on new flow
 
   const handlePayment = async () => {
     setIsProcessing(true);
 
-    if (isMockEnabled) {
+    if (health.mode === 'mock') {
       setShowMockModal(true);
-      setIsProcessing(false);
-      return;
-    }
-
-    if (!isHealthChecked) {
-      onPaymentError('El servicio de pagos no está disponible. Intenta de nuevo más tarde.');
       setIsProcessing(false);
       return;
     }
@@ -103,14 +116,15 @@ export default function Payment({
     setShowMockModal(false);
     onPaymentSuccess(result);
   };
-
+  
+  const canPay = (health.ok || health.mode === 'mock') && !isProcessing;
   const serviceFee = 2500;
   const iva = (price + serviceFee) * 0.19;
   const total = price + serviceFee + iva;
 
   return (
     <div className="w-full space-y-4 rounded-lg bg-background p-4 text-sm">
-      {isMockEnabled && (
+      {health.mode === 'mock' && (
         <Badge
           variant="outline"
           className="w-full justify-center border-amber-500/50 bg-amber-50 text-amber-700"
@@ -118,6 +132,13 @@ export default function Payment({
           <FlaskConical className="mr-2 h-4 w-4" />
           Modo de pruebas: el pago se simula.
         </Badge>
+      )}
+       {health.error && health.mode === 'real' && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Servicio no disponible</AlertTitle>
+          <AlertDescription>{health.error}</AlertDescription>
+        </Alert>
       )}
       <h3 className="text-center text-lg font-bold text-foreground">
         Resumen de tu pago
@@ -169,7 +190,7 @@ export default function Payment({
       <div className="pt-2">
         <Button
           onClick={handlePayment}
-          disabled={isProcessing || (!isMockEnabled && !isHealthChecked)}
+          disabled={!canPay}
           className="h-12 w-full bg-green-500 text-base text-white transition-all hover:bg-green-600 hover:scale-105"
           size="lg"
         >
@@ -178,7 +199,7 @@ export default function Payment({
           ) : (
             <CreditCard className="mr-2 h-5 w-5" />
           )}
-          {isProcessing ? 'Procesando pago...' : 'Pagar'}
+          {isProcessing ? 'Procesando...' : 'Pagar'}
         </Button>
       </div>
 
@@ -188,7 +209,7 @@ export default function Payment({
           className="border-transparent bg-green-100/80 font-normal text-green-900"
         >
           <ShieldCheck className="mr-1.5 h-4 w-4 text-green-600" />
-          {isMockEnabled ? "Pago Simulado" : "Wompi by Bancolombia – PCI DSS"}
+          {health.mode === 'mock' ? "Pago Simulado" : "Wompi by Bancolombia – PCI DSS"}
         </Badge>
       </div>
 

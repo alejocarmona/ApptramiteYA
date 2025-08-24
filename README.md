@@ -38,6 +38,15 @@ This flag allows you to switch between the real Wompi payment service and a loca
 NEXT_PUBLIC_USE_PAYMENT_MOCK="true"
 ```
 
+#### Feature Flag for Mock Fallback
+This flag controls the behavior when the real Wompi service health check fails (`NEXT_PUBLIC_USE_PAYMENT_MOCK="false"`).
+- Set to `"true"` to automatically switch to the mock payment flow. This is useful for frontend development without requiring Wompi credentials.
+- Set to `"false"` to show an error and disable payments. This is the recommended setting for production.
+
+```
+NEXT_PUBLIC_PAYMENT_FALLBACK_TO_MOCK="false"
+```
+
 #### Wompi Payments (For Emulator/Local Development Only)
 These variables are used for local development when running the Firebase Emulator Suite with the **real** Wompi service (`NEXT_PUBLIC_USE_PAYMENT_MOCK="false"`). In production, these values are set via Firebase Functions configuration.
 
