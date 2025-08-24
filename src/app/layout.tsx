@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster"
 import './globals.css';
+import '@/server/lib/firebase'; // Ensure Firebase is initialized on the client side
 
 export const metadata: Metadata = {
   title: 'Trámite Fácil',
