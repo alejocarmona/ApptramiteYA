@@ -451,34 +451,6 @@ export default function TramiteFacil() {
     setCurrentField((prev) => prev + 1);
   };
   
-  const handlePaymentResult = async (result: PaymentResult) => {
-    await logPaymentEvent(result);
-    setFlowState((prev) => ({...prev, transactionId: result.reference }));
-
-    switch (result.status) {
-      case 'APPROVED':
-        handlePaymentSuccess();
-        break;
-      case 'DECLINED':
-        addMessage('lia', <div className="flex items-center gap-2"><AlertTriangle className="text-amber-500" /><span>Pago rechazado: {result.reason}</span></div>);
-        break;
-      case 'CANCELLED':
-        addMessage('lia', <div className="flex items-center gap-2"><Ban className="text-red-500" /><span>{result.reason}</span></div>);
-        break;
-      case 'ERROR':
-        addMessage('lia', <div className="flex items-center gap-2"><XCircle className="text-destructive" /><span>Error de pago: {result.reason}</span></div>);
-        break;
-    }
-  };
-
-  const handlePaymentError = (message: string) => {
-    toast({
-        title: 'Error de Pago',
-        description: message,
-        variant: 'destructive',
-    });
-  };
-
   const handlePaymentSuccess = async () => {
     addMessage(
       'lia',
@@ -516,6 +488,34 @@ export default function TramiteFacil() {
         addMessage('lia', <SuccessCelebration onReset={() => resetState(false)} />);
       }, 7000);
     }, 500);
+  };
+
+  const handlePaymentResult = async (result: PaymentResult) => {
+    await logPaymentEvent(result);
+    setFlowState((prev) => ({...prev, transactionId: result.reference }));
+
+    switch (result.status) {
+      case 'APPROVED':
+        handlePaymentSuccess();
+        break;
+      case 'DECLINED':
+        addMessage('lia', <div className="flex items-center gap-2"><AlertTriangle className="text-amber-500" /><span>Pago rechazado: {result.reason}</span></div>);
+        break;
+      case 'CANCELLED':
+        addMessage('lia', <div className="flex items-center gap-2"><Ban className="text-red-500" /><span>{result.reason}</span></div>);
+        break;
+      case 'ERROR':
+        addMessage('lia', <div className="flex items-center gap-2"><XCircle className="text-destructive" /><span>Error de pago: {result.reason}</span></div>);
+        break;
+    }
+  };
+
+  const handlePaymentError = (message: string) => {
+    toast({
+        title: 'Error de Pago',
+        description: message,
+        variant: 'destructive',
+    });
   };
 
   const currentStep = flowState.step;
