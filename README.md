@@ -27,8 +27,19 @@ This is required for the AI features to work.
 GEMINI_API_KEY=
 ```
 
-### Wompi Payments (For Emulator/Local Development Only)
-These variables are used for local development when running the Firebase Emulator Suite. In production, these values are set via Firebase Functions configuration.
+### Payment Configuration
+
+#### Feature Flag for Mock Payments
+This flag allows you to switch between the real Wompi payment service and a local mock for testing purposes.
+- Set to `"true"` to use the mock payment modal.
+- Set to `"false"` to use the real Wompi integration.
+
+```
+NEXT_PUBLIC_USE_PAYMENT_MOCK="true"
+```
+
+#### Wompi Payments (For Emulator/Local Development Only)
+These variables are used for local development when running the Firebase Emulator Suite with the **real** Wompi service (`NEXT_PUBLIC_USE_PAYMENT_MOCK="false"`). In production, these values are set via Firebase Functions configuration.
 
 ```
 WOMPI_PRIVATE=prv_test_your_sandbox_key_here

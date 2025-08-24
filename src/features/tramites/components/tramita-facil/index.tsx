@@ -14,6 +14,9 @@ import {
   Star,
   RefreshCcw,
   MoreVertical,
+  XCircle,
+  AlertTriangle,
+  Ban,
 } from 'lucide-react';
 import {
   Card,
@@ -38,6 +41,7 @@ import {useKeyboardPadding} from '@/hooks/use-keyboard-padding';
 import {
   markTransactionAsDelivered,
   cancelTransaction,
+  logPaymentEvent,
 } from '@/server/db/collections';
 import type {
   FlowContext,
@@ -61,6 +65,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
+import type { PaymentResult } from '@/types/payment';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -445,9 +450,25 @@ export default function TramiteFacil() {
     setUserInput('');
     setCurrentField((prev) => prev + 1);
   };
+  
+  const handlePaymentResult = async (result: PaymentResult) => {
+    await logPaymentEvent(result);
+    setFlowState((prev) => ({...prev, transactionId: result.reference }));
 
-  const handlePaymentInitiation = (transactionId: string) => {
-      setFlowState((prev) => ({...prev, transactionId }));
+    switch (result.status) {
+      case 'APPROVED':
+        handlePaymentSuccess();
+        break;
+      case 'DECLINED':
+        addMessage('lia', <div className="flex items-center gap-2"><AlertTriangle className="text-amber-500" /><span>Pago rechazado: {result.reason}</span></div>);
+        break;
+      case 'CANCELLED':
+        addMessage('lia', <div className="flex items-center gap-2"><Ban className="text-red-500" /><span>{result.reason}</span></div>);
+        break;
+      case 'ERROR':
+        addMessage('lia', <div className="flex items-center gap-2"><XCircle className="text-destructive" /><span>Error de pago: {result.reason}</span></div>);
+        break;
+    }
   };
 
   const handlePaymentError = (message: string) => {
@@ -563,8 +584,7 @@ export default function TramiteFacil() {
                     tramiteName={selectedTramite.name}
                     price={selectedTramite.priceCop}
                     formData={formData}
-                    onPaymentInitiation={handlePaymentInitiation}
-                    onPaymentSuccess={handlePaymentSuccess}
+                    onPaymentSuccess={handlePaymentResult}
                     onPaymentError={handlePaymentError}
                   />
                 }

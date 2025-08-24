@@ -6,9 +6,11 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
+  setDoc,
 } from 'firebase/firestore';
 import type {TransactionDoc} from './schema';
 import {collections} from './schema';
+import type { PaymentResult } from '@/types/payment';
 
 /**
  * Creates a new transaction document in Firestore.
@@ -35,6 +37,31 @@ export async function createTransaction(
   const docRef = await addDoc(transactionsCollection, newTransaction);
   return docRef.id;
 }
+
+
+export async function logPaymentEvent(result: PaymentResult) {
+    const paymentRef = doc(firestore, collections.transaction(result.reference));
+    const dataToLog = {
+      id: result.reference,
+      status: result.status.toLowerCase(),
+      provider: 'mock',
+      transactionId: result.transactionId,
+      reason: result.reason || null,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    };
+
+    try {
+        // Using set with merge: true will create the doc if it doesn't exist,
+        // or update it if it does.
+        await setDoc(paymentRef, dataToLog, { merge: true });
+    } catch (error) {
+        console.error("Failed to log payment event to Firestore:", error);
+        // Depending on requirements, you might want to throw this error
+        // or handle it silently.
+    }
+}
+
 
 /**
  * Updates a transaction document upon successful payment.

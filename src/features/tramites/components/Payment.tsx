@@ -10,76 +10,66 @@ import {
   MessageCircle,
   Shield,
   ShieldCheck,
+  FlaskConical,
 } from 'lucide-react';
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
-import {httpsCallable, Functions} from 'firebase/functions';
 import {useToast} from '@/hooks/use-toast';
-import {getFirebaseFunctions} from '@/lib/firebase';
-import {FirebaseError} from 'firebase/app';
+import PaymentMock from '@/components/payments/PaymentMock';
+import { usePaymentMock } from '@/lib/flags';
+import { startPayment } from '@/services/payments';
+import type { PaymentResult, PaymentInput } from '@/types/payment';
 
 type PaymentProps = {
   price: number;
   tramiteName: string;
   formData: Record<string, string>;
-  onPaymentInitiation: (transactionId: string) => void;
-  onPaymentSuccess: () => void;
+  onPaymentSuccess: (result: PaymentResult) => void;
   onPaymentError: (message: string) => void;
 };
-
-// Initialize functions instance once
-let functions: Functions;
-try {
-  functions = getFirebaseFunctions();
-} catch (error) {
-  console.error("Could not initialize Firebase Functions:", error);
-}
 
 export default function Payment({
   price,
   tramiteName,
   formData,
-  onPaymentInitiation,
   onPaymentSuccess,
   onPaymentError,
 }: PaymentProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isHealthChecked, setIsHealthChecked] = useState(false);
+  const [showMockModal, setShowMockModal] = useState(false);
+
   const {toast} = useToast();
+  const isMockEnabled = usePaymentMock();
 
-  // Perform a health check on component mount
   useEffect(() => {
-    const checkHealth = async () => {
-      if (!functions) {
-        toast({
-          title: 'Error de Configuración',
-          description: 'El servicio de pagos no está disponible en este momento.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      try {
-        const wompiHealth = httpsCallable(functions, 'wompiHealth');
-        await wompiHealth();
-        setIsHealthChecked(true);
-      } catch (error: any) {
-        console.error('Payment service health check failed:', error);
-        toast({
-          title: 'Servicio no disponible',
-          description: `El sistema de pagos no está configurado correctamente. Por favor, intenta más tarde.`,
-          variant: 'destructive',
-        });
-      }
-    };
-
-    if (!isHealthChecked) {
+    // Health check is only needed for real payments
+    if (!isMockEnabled && !isHealthChecked) {
+      const checkHealth = async () => {
+        try {
+            await startPayment({ healthCheck: true });
+            setIsHealthChecked(true);
+        } catch (error: any) {
+            console.error('Payment service health check failed:', error);
+            toast({
+                title: 'Servicio no disponible',
+                description: `El sistema de pagos no está configurado correctamente. Por favor, intenta más tarde.`,
+                variant: 'destructive',
+            });
+        }
+      };
       checkHealth();
     }
-  }, [isHealthChecked, toast]);
+  }, [isMockEnabled, isHealthChecked, toast]);
 
   const handlePayment = async () => {
     setIsProcessing(true);
+
+    if (isMockEnabled) {
+      setShowMockModal(true);
+      setIsProcessing(false);
+      return;
+    }
 
     if (!isHealthChecked) {
       onPaymentError('El servicio de pagos no está disponible. Intenta de nuevo más tarde.');
@@ -90,70 +80,28 @@ export default function Payment({
     const serviceFee = 2500;
     const iva = (price + serviceFee) * 0.19;
     const totalInCents = Math.round((price + serviceFee + iva) * 100);
-    const reference = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    const paymentInput: PaymentInput = {
+      tramiteName: tramiteName,
+      amountInCents: totalInCents,
+      currency: 'COP',
+      formData: formData,
+      reference: `order_${Date.now()}`,
+    };
 
     try {
-      const createWompiTransaction = httpsCallable(functions, 'createWompiTransaction');
-
-      const result: any = await createWompiTransaction({
-        tramiteName: tramiteName,
-        amountInCents: totalInCents,
-        currency: 'COP',
-        reference: reference,
-        formData: formData,
-        paymentMethod: {
-          // This is an example, in a real app this would come from a form
-          type: 'CARD',
-          installments: 1,
-        },
-      });
-
-      if (result.data.ok && result.data.transactionId) {
-        onPaymentInitiation(result.data.transactionId);
-        // This simulates the user completing the checkout on Wompi's side.
-        // In a real implementation, you would use Wompi's JS widget and webhooks.
-        setTimeout(() => {
-          onPaymentSuccess();
-        }, 2000);
-      } else {
-        throw new Error(result.data.error || 'Respuesta inesperada del servidor.');
-      }
+      const result = await startPayment(paymentInput);
+      onPaymentSuccess(result);
     } catch (error: any) {
-      console.error('Payment failed:', error);
-
-      let title = 'Error de Pago';
-      let description = 'Ocurrió un error desconocido al procesar el pago.';
-      
-      if (error.code && error.message) {
-         const details = error.details as any;
-         const requestId = details?.requestId;
-
-        switch (error.code) {
-          case 'invalid-argument':
-            title = 'Datos Inválidos';
-            description = 'Por favor, revisa los datos del pago e intenta de nuevo.';
-            break;
-          case 'failed-precondition':
-            if (error.message === 'missing_wompi_private' || error.message === 'missing_config') {
-              title = 'Servicio en Mantenimiento';
-              description = 'El servicio de pago no está disponible temporalmente. Intenta más tarde.';
-            } else if (error.message === 'wompi_error') {
-               title = 'Error del Proveedor de Pagos';
-               description = `No pudimos crear la transacción (código ${details?.status}). Intenta de nuevo.`;
-            }
-            break;
-          case 'internal':
-            title = 'Error Interno';
-            description = `Ocurrió un error inesperado. Si persiste, contacta a soporte. (ID: ${requestId || 'N/A'})`;
-            break;
-        }
-      }
-
-      onPaymentError(description);
-      toast({ title, description, variant: 'destructive' });
+       onPaymentError(error.message || 'Ocurrió un error desconocido.');
     } finally {
       setIsProcessing(false);
     }
+  };
+  
+  const handleMockResult = (result: PaymentResult) => {
+    setShowMockModal(false);
+    onPaymentSuccess(result);
   };
 
   const serviceFee = 2500;
@@ -162,6 +110,15 @@ export default function Payment({
 
   return (
     <div className="w-full space-y-4 rounded-lg bg-background p-4 text-sm">
+      {isMockEnabled && (
+        <Badge
+          variant="outline"
+          className="w-full justify-center border-amber-500/50 bg-amber-50 text-amber-700"
+        >
+          <FlaskConical className="mr-2 h-4 w-4" />
+          Modo de pruebas: el pago se simula.
+        </Badge>
+      )}
       <h3 className="text-center text-lg font-bold text-foreground">
         Resumen de tu pago
       </h3>
@@ -212,7 +169,7 @@ export default function Payment({
       <div className="pt-2">
         <Button
           onClick={handlePayment}
-          disabled={isProcessing || !isHealthChecked}
+          disabled={isProcessing || (!isMockEnabled && !isHealthChecked)}
           className="h-12 w-full bg-green-500 text-base text-white transition-all hover:bg-green-600 hover:scale-105"
           size="lg"
         >
@@ -221,7 +178,7 @@ export default function Payment({
           ) : (
             <CreditCard className="mr-2 h-5 w-5" />
           )}
-          {isProcessing ? 'Procesando pago...' : 'Pagar con Wompi'}
+          {isProcessing ? 'Procesando pago...' : 'Pagar'}
         </Button>
       </div>
 
@@ -231,7 +188,7 @@ export default function Payment({
           className="border-transparent bg-green-100/80 font-normal text-green-900"
         >
           <ShieldCheck className="mr-1.5 h-4 w-4 text-green-600" />
-          Wompi by Bancolombia – PCI DSS
+          {isMockEnabled ? "Pago Simulado" : "Wompi by Bancolombia – PCI DSS"}
         </Badge>
       </div>
 
@@ -249,6 +206,11 @@ export default function Payment({
           <span>Soporte 24/7</span>
         </div>
       </div>
+       <PaymentMock
+        open={showMockModal}
+        onClose={() => setShowMockModal(false)}
+        onResult={handleMockResult}
+      />
     </div>
   );
 }

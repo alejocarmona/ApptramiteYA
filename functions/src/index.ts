@@ -63,6 +63,7 @@ export const createWompiTransaction = functions.https.onCall(
         amountInCents,
         currency,
         status: 'initiated',
+        provider: 'wompi',
         formData,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -93,6 +94,11 @@ export const createWompiTransaction = functions.https.onCall(
           error: 'Wompi API error',
           status: response.status,
           body: wompiResult,
+        });
+        await transactionRef.update({
+            status: 'error',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            errorDetails: { status: response.status, body: wompiResult },
         });
         throw new functions.https.HttpsError(
           'failed-precondition',

@@ -18,13 +18,17 @@ export const TransactionDocSchema = BaseDocSchema.extend({
   tramiteName: z.string(),
   amount: z.number().positive(),
   currency: z.string().default('COP'),
-  status: z.enum(['pending', 'paid', 'failed', 'delivered', 'cancelled']),
-  formData: z.record(z.string(), z.any()),
+  status: z.enum(['pending', 'paid', 'failed', 'delivered', 'cancelled', 'initiated', 'created', 'error', 'approved', 'declined']),
+  formData: z.record(z.string(), z.any()).optional(),
   wompiId: z.string().optional(),
   paidAt: z.any().optional(),
   deliveredAt: z.any().optional(),
   cancelledAt: z.any().optional(),
   cancellationReason: z.string().optional(),
+  provider: z.enum(['wompi', 'mock']).optional(),
+  errorDetails: z.any().optional(),
+  reason: z.string().optional().nullable(),
+  transactionId: z.string().optional(),
 });
 export type TransactionDoc = z.infer<typeof TransactionDocSchema>;
 
