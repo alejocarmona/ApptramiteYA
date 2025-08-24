@@ -257,7 +257,7 @@ export default function TramiteFacil() {
     setUserInput('');
     setMessages([]);
   }, [log]);
-  
+
   const handleTramiteSelect = useCallback((tramite: Tramite) => {
     log('INFO', `Tramite selected: ${tramite.id}`);
     setMessages(currentMessages => currentMessages.slice(0, 1));
