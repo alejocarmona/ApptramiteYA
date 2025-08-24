@@ -292,7 +292,7 @@ export default function TramiteFacil() {
       setIsProcessingPayment(false);
       log('INFO', 'Received payment result in main component.', {result});
       await logPaymentEvent(result);
-      
+
       if (result.status === 'APPROVED') {
         log('SUCCESS', 'Payment approved, handling success.', {result});
         addMessage(
@@ -543,17 +543,12 @@ export default function TramiteFacil() {
       );
     }
 
-    const lastMessageIsProgress =
-      lastMessage?.content &&
-      typeof lastMessage.content === 'object' &&
-      React.isValidElement(lastMessage.content) &&
-      lastMessage.content.type === DocumentGenerationProgress;
-    if (flowState.status === 'generating' && !lastMessageIsProgress) {
-      addMessage('lia', <DocumentGenerationProgress />);
-      setTimeout(async () => {
+    if (flowState.status === 'generating') {
+      const timer = setTimeout(() => {
         log('SUCCESS', 'Document generation simulation finished.');
         setFlowState(prev => ({...prev, status: 'completed'}));
       }, 7000);
+      return () => clearTimeout(timer);
     }
 
     const lastMessageIsDownloader =
@@ -784,6 +779,11 @@ export default function TramiteFacil() {
               )}
             </div>
           </ScrollArea>
+           {flowState.status === 'generating' && (
+            <div className="border-t p-4">
+              <DocumentGenerationProgress />
+            </div>
+          )}
         </CardContent>
 
         {flowState.status === 'filling' && (
