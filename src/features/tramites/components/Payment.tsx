@@ -1,3 +1,4 @@
+
 'use client';
 
 import {useState} from 'react';
@@ -45,7 +46,7 @@ export default function Payment({
 
     const serviceFee = 2500;
     const iva = (price + serviceFee) * 0.19;
-    const totalInCents = (price + serviceFee + iva) * 100;
+    const totalInCents = Math.round((price + serviceFee + iva) * 100);
 
     try {
       const functions = getFunctions(getApp(), FIREBASE_REGION);
@@ -71,7 +72,7 @@ export default function Payment({
 
     } catch (error: any) {
       console.error('Payment failed:', error);
-      const errorMessage = error.message || 'Ocurrió un error desconocido.';
+      const errorMessage = error.details?.message || error.message || 'Ocurrió un error desconocido.';
       onPaymentError(`No pudimos iniciar el proceso de pago. Detalle: ${errorMessage}`);
       toast({
         title: 'Error de Pago',
