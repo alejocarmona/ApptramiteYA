@@ -59,11 +59,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {buttonVariants} from '@/components/ui/button';
-import {usePayment} from '@/features/payments/provider';
 import {useAppLogger} from '@/lib/logger';
 import { v4 as uuidv4 } from 'uuid';
 import type { PaymentResult } from '@/types/payment';
 import PaymentMockDialog from '@/components/payments/PaymentMock';
+import { usePaymentMock } from '@/lib/flags';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -231,7 +231,7 @@ export default function TramiteFacil() {
   const [isLiaTyping, setIsLiaTyping] = useState<boolean>(false);
   const [userInput, setUserInput] = useState('');
   
-  // State for mock payment modal
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isMockModalOpen, setIsMockModalOpen] = useState(false);
   const [currentMockReference, setCurrentMockReference] = useState<string | null>(null);
 
@@ -239,6 +239,7 @@ export default function TramiteFacil() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
   const keyboardPadding = useKeyboardPadding();
+  const isMock = usePaymentMock();
 
   const addMessage = useCallback((sender: 'user' | 'lia', content: React.ReactNode) => {
     const newMessage = {sender, content, id: getUniqueMessageId()};
@@ -277,7 +278,7 @@ export default function TramiteFacil() {
       </div>
     );
   },[addMessage, log, handleTramiteSelect]);
-
+  
   const resetFlow = useCallback(() => {
     log('INFO', 'Resetting flow.');
     setFlowState(initialFlow);
@@ -291,6 +292,7 @@ export default function TramiteFacil() {
   }, [startInitialFlow, log]);
   
   const handlePaymentResult = useCallback(async (result: PaymentResult) => {
+    setIsProcessingPayment(false);
     log('INFO', 'Received payment result in main component.', {result});
     await logPaymentEvent(result);
     setFlowState((prev) => ({...prev, transactionId: result.reference}));
@@ -315,18 +317,6 @@ export default function TramiteFacil() {
       addMessage('lia', content[result.status] || content['ERROR']);
     }
   }, [addMessage, log]);
-
-  const showMockModal = useCallback((reference: string) => {
-    log('INFO', 'Showing mock payment modal.', { reference });
-    setCurrentMockReference(reference);
-    setIsMockModalOpen(true);
-  }, [log]);
-  
-  const {initiatePayment, isProcessingPayment} = usePayment({
-    onSuccess: handlePaymentResult,
-    onError: handlePaymentResult,
-    showMockModal,
-  });
   
   const handleMockResult = useCallback((result: Omit<PaymentResult, 'reference'>) => {
     if (currentMockReference) {
@@ -352,6 +342,29 @@ export default function TramiteFacil() {
     }
     setCurrentMockReference(null);
   }, [currentMockReference, handlePaymentResult, log]);
+
+  const handlePay = useCallback(() => {
+    if (!selectedTramite) return;
+    
+    log('INFO', `Payment initiated for ${selectedTramite.id}. Is mock: ${isMock}`);
+    setIsProcessingPayment(true);
+    
+    if (isMock) {
+      const reference = `MOCK-${uuidv4()}`;
+      log('INFO', 'Initiating MOCK payment', { reference });
+      setCurrentMockReference(reference);
+      setIsMockModalOpen(true);
+    } else {
+      // Real payment logic would go here.
+      log('WARN', 'Real payment provider not implemented.');
+      setIsProcessingPayment(false);
+       toast({
+        title: 'Servicio no disponible',
+        description: 'La pasarela de pagos real no está implementada aún.',
+        variant: 'destructive',
+      });
+    }
+  }, [isMock, selectedTramite, log, toast]);
 
   const handleCancelFlow = useCallback(async (reason?: string) => {
     log('WARN', `Flow cancellation requested. Reason: ${reason}`, {
@@ -431,13 +444,7 @@ export default function TramiteFacil() {
          <Payment 
             tramiteName={selectedTramite.name} 
             price={selectedTramite.priceCop} 
-            onPay={() => initiatePayment({
-              tramiteId: selectedTramite.id,
-              tramiteName: selectedTramite.name,
-              amountInCents: (selectedTramite.priceCop + 2500 + (selectedTramite.priceCop + 2500) * 0.19) * 100,
-              currency: 'COP',
-              formData: formData,
-            })} 
+            onPay={handlePay} 
             isProcessing={isProcessingPayment} 
           />
        );
@@ -477,9 +484,8 @@ export default function TramiteFacil() {
     addMessage, 
     resetFlow, 
     log, 
-    initiatePayment,
+    handlePay,
     isProcessingPayment,
-    formData,
   ]);
 
   useEffect(() => {
