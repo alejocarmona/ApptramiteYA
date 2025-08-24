@@ -1,6 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { z } from "zod";
+import {z} from "zod";
 import fetch from "node-fetch";
 
 // Initialize Firebase Admin SDK
@@ -51,7 +51,7 @@ export const createWompiTransaction = functions.https.onCall(
       );
     }
 
-    const { tramiteName, amountInCents, formData } = validation.data;
+    const {tramiteName, amountInCents, formData} = validation.data;
     const amountInCop = amountInCents / 100;
 
     // 2. Get Wompi credentials from Firebase config
@@ -90,7 +90,7 @@ export const createWompiTransaction = functions.https.onCall(
       customer_email: formData.email || `user-${Date.now()}@example.com`,
       payment_method: {
         type: "CARD", // Example, would ideally come from client
-        installments: 1
+        installments: 1,
       },
       reference: transactionId,
       // In a real app, you'd add customer_data, shipping_address, etc.
@@ -98,38 +98,41 @@ export const createWompiTransaction = functions.https.onCall(
 
     try {
       const response = await fetch(`${wompiUrl}/transactions`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${wompiPrivateKey}`,
         },
         body: JSON.stringify(wompiPayload),
       });
 
-      const wompiResult = await response.json() as any;
+      const wompiResult = (await response.json()) as any;
 
       if (!response.ok) {
         console.error("Wompi API error:", wompiResult);
-        const errorDetail = wompiResult?.error?.messages || wompiResult?.error || 'Unknown Wompi error';
+        const errorDetail =
+          wompiResult?.error?.messages ||
+          wompiResult?.error ||
+          "Unknown Wompi error";
         // Optionally update Firestore doc to 'failed' here
         await transactionRef.update({
-            status: 'failed',
-            cancellationReason: JSON.stringify(errorDetail),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: "failed",
+          cancellationReason: JSON.stringify(errorDetail),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         throw new functions.https.HttpsError(
-            "aborted",
-            "Payment provider rejected the transaction.",
-            errorDetail
+          "aborted",
+          "Payment provider rejected the transaction.",
+          errorDetail
         );
       }
-      
+
       // 5. Update transaction with Wompi ID
       await transactionRef.update({
         wompiId: wompiResult.data.id,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      
+
       // 6. Return a successful JSON response
       return {
         ok: true,
@@ -137,17 +140,16 @@ export const createWompiTransaction = functions.https.onCall(
         transactionId: transactionId,
         wompiTransaction: wompiResult.data,
       };
-
     } catch (error: any) {
-       console.error("Error calling Wompi or processing transaction:", error);
-       if (error instanceof functions.https.HttpsError) {
-         throw error; // Re-throw HttpsError
-       }
-       throw new functions.https.HttpsError(
-         "internal",
-         "An internal error occurred while processing the payment.",
-         error.message
-       );
+      console.error("Error calling Wompi or processing transaction:", error);
+      if (error instanceof functions.https.HttpsError) {
+        throw error; // Re-throw HttpsError
+      }
+      throw new functions.https.HttpsError(
+        "internal",
+        "An internal error occurred while processing the payment.",
+        error.message
+      );
     }
   }
 );
