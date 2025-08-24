@@ -17,7 +17,7 @@ import {usePaymentMock} from '@/lib/flags';
 type PaymentProps = {
   price: number;
   tramiteName: string;
-  onPay: () => void; // Changed from onPaymentResult
+  onPay: () => void;
   isProcessing: boolean;
 };
 

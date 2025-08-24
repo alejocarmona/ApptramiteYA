@@ -43,6 +43,7 @@ import {
   markTransactionAsDelivered,
   cancelTransaction,
   logPaymentEvent,
+  markTransactionAsPaid,
 } from '@/server/db/collections';
 import type {
   FlowContext,
@@ -253,12 +254,12 @@ export default function TramiteFacil() {
     },
     []
   );
-  
+
   const startInitialMessages = useCallback(() => {
     addMessage('lia', <WelcomeHero onStart={() => document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'})} />);
     addMessage('lia', <div id="tramite-selector"><TramiteSelector onSelect={handleTramiteSelect} /></div>)
   }, [addMessage]);
-
+  
   const resetFlow = useCallback(() => {
     setFlowState(initialFlow);
     setSelectedTramite(null);
@@ -400,7 +401,6 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage]);
 
   useEffect(() => {
-    // This effect should ONLY run when we are in the 'filling' status.
     if (flowState.status !== 'filling' || isLiaTyping || !selectedTramite) {
       return;
     }
@@ -408,15 +408,7 @@ export default function TramiteFacil() {
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return;
   
-    // Ask the first question right after the intro message from LIA.
-    if (currentField === 0 && lastMessage.sender === 'lia') {
-      const isIntroMessage = (lastMessage.content as React.ReactElement)?.props?.children?.[0]?.props?.children === '¡Excelente elección!';
-      if (isIntroMessage) {
-        askNextQuestion();
-      }
-    } 
-    // Ask subsequent questions only after the user has replied.
-    else if (currentField > 0 && lastMessage.sender === 'user') {
+    if (lastMessage.sender === 'user' || (currentField === 0 && lastMessage.sender === 'lia' && (lastMessage.content as React.ReactElement)?.props?.children?.[0]?.props?.children === '¡Excelente elección!')) {
       askNextQuestion();
     }
   
@@ -480,6 +472,8 @@ export default function TramiteFacil() {
   
   const handlePaymentResult = useCallback(async (result: PaymentResult) => {
     setShowMockModal(false);
+    setIsLiaTyping(false);
+    
     // This is the orchestrator. It ensures operations happen in sequence.
     await logPaymentEvent(result);
     setFlowState((prev) => ({ ...prev, transactionId: result.reference }));
@@ -501,13 +495,8 @@ export default function TramiteFacil() {
   }, [addMessage, handlePaymentSuccess]);
 
   const handlePayClick = () => {
-    setIsLiaTyping(true); // Visually disable the pay button
-    if (isMockEnabled) {
-      setShowMockModal(true);
-    } else {
-      // Real payment logic would go here
-      console.log("Initiating real payment flow...");
-    }
+    setIsLiaTyping(true); 
+    setShowMockModal(true);
   };
 
 
@@ -602,7 +591,10 @@ export default function TramiteFacil() {
             open={showMockModal}
             onClose={() => {
               setShowMockModal(false);
-              setIsLiaTyping(false); // Re-enable pay button
+              // Only re-enable pay button if payment wasn't approved
+              if (flowState.status === 'paying') {
+                 setIsLiaTyping(false);
+              }
             }}
             onResult={handlePaymentResult}
           />
