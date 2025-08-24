@@ -131,10 +131,7 @@ function DocumentGenerationProgress() {
   );
 }
 
-function WelcomeHero() {
-  const scrollToTramites = () => {
-    document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'});
-  };
+function WelcomeHero({onStart}: {onStart: () => void}) {
   return (
     <div className="rounded-lg bg-card p-4 py-4 text-center sm:py-6">
       <Avatar className="mx-auto mb-4 h-12 w-12 border-4 border-primary/20 bg-primary/10 sm:h-16 sm:w-16">
@@ -157,7 +154,7 @@ function WelcomeHero() {
       </div>
       <div className="mt-6">
         <Button
-          onClick={scrollToTramites}
+          onClick={onStart}
           size="lg"
           className="min-h-[44px] w-full sm:w-auto"
         >
@@ -251,6 +248,11 @@ export default function TramiteFacil() {
     },
     []
   );
+  
+  const startInitialMessages = useCallback(() => {
+    addMessage('lia', <WelcomeHero onStart={() => document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'})} />);
+    addMessage('lia', <div id="tramite-selector"><TramiteSelector onSelect={handleTramiteSelect} /></div>)
+  }, [addMessage]);
 
   const resetFlow = useCallback(() => {
     setFlowState(initialFlow);
@@ -259,29 +261,13 @@ export default function TramiteFacil() {
     setCurrentField(0);
     setIsLiaTyping(false);
     setUserInput('');
-    setMessages([
-        {
-            sender: 'lia',
-            content: <WelcomeHero />,
-            id: getUniqueMessageId(),
-        },
-        {
-            sender: 'lia',
-            content: (
-                <div id="tramite-selector">
-                    <TramiteSelector onSelect={(tramite) => handleTramiteSelect(tramite, true)} />
-                </div>
-            ),
-            id: getUniqueMessageId(),
-        }
-    ]);
-  }, []);
+    setMessages([]);
+    startInitialMessages();
+  }, [startInitialMessages]);
 
   const handleTramiteSelect = useCallback(
-    (tramite: Tramite, isNewFlow = false) => {
-      if (isNewFlow) {
-          setMessages(currentMessages => currentMessages.slice(0, 2));
-      }
+    (tramite: Tramite) => {
+      setMessages((currentMessages) => currentMessages.slice(0, 2));
       
       addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
       setSelectedTramite(tramite);
@@ -336,9 +322,7 @@ export default function TramiteFacil() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => {
-             resetFlow();
-          }}>
+          <DropdownMenuItem onSelect={resetFlow}>
             Cambiar trámite
           </DropdownMenuItem>
           <AlertDialogTrigger asChild>
@@ -375,8 +359,8 @@ export default function TramiteFacil() {
   );
 
   useEffect(() => {
-    resetFlow();
-  }, [resetFlow]);
+    startInitialMessages();
+  }, [startInitialMessages]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -388,7 +372,7 @@ export default function TramiteFacil() {
   }, [messages]);
 
   const askNextQuestion = useCallback(() => {
-    if (!selectedTramite || flowState.status !== 'filling') return;
+    if (!selectedTramite) return;
 
     setIsLiaTyping(true);
     setTimeout(() => {
@@ -407,28 +391,32 @@ export default function TramiteFacil() {
       }
       setIsLiaTyping(false);
     }, 500);
-  }, [selectedTramite, currentField, addMessage, flowState.status]);
+  }, [selectedTramite, currentField, addMessage]);
 
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    if (
-      flowState.status === 'filling' &&
-      !isLiaTyping &&
-      selectedTramite &&
-      lastMessage
-    ) {
-      const isLastMessageFromLia = lastMessage.sender === 'lia';
-
-      // Ask first question right after tramite selection and LIA's confirmation.
-      if (currentField === 0 && isLastMessageFromLia && messages.length <= 4) {
-        askNextQuestion();
-      }
-      // Ask next question only after user has replied.
-      else if (currentField > 0 && !isLastMessageFromLia) {
-        askNextQuestion();
-      }
+    // This effect should ONLY run when we are in the 'filling' status.
+    if (flowState.status !== 'filling' || isLiaTyping || !selectedTramite) {
+      return;
     }
-  }, [flowState.status, isLiaTyping, askNextQuestion, messages, selectedTramite, currentField]);
+  
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage) return;
+  
+    // Ask the first question right after the intro message from LIA.
+    if (currentField === 0 && lastMessage.sender === 'lia') {
+      // Check if the message content is the intro to avoid re-asking.
+      const isIntroMessage = (lastMessage.content as React.ReactElement)?.props?.children?.[0]?.props?.children === '¡Excelente elección!';
+      if (isIntroMessage) {
+        askNextQuestion();
+      }
+    } 
+    // Ask subsequent questions only after the user has replied.
+    else if (currentField > 0 && lastMessage.sender === 'user') {
+      askNextQuestion();
+    }
+  
+  }, [flowState.status, isLiaTyping, messages, selectedTramite, currentField, askNextQuestion]);
+
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -467,37 +455,28 @@ export default function TramiteFacil() {
       </div>
     );
     setFlowState((prev) => ({...prev, status: 'generating'}));
-    setIsLiaTyping(true);
+    setIsLiaTyping(true); // Show generating progress
 
+    // Simulate API call to mark transaction as paid in our DB
     if (flowState.transactionId) {
-      await fetch('/api/webhooks/wompi', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          data: {
-            transaction: {
-              transactionId: flowState.transactionId,
-              wompiId: `wompi_${Date.now()}`,
-            },
-          },
-        }),
-      });
+      await markTransactionAsPaid(flowState.transactionId, `wompi_${Date.now()}`);
     }
 
+    // Simulate document generation delay
     setTimeout(async () => {
       if (flowState.transactionId) {
         await markTransactionAsDelivered(flowState.transactionId);
       }
       setFlowState((prev) => ({...prev, step: 4, status: 'completed'}));
-      setIsLiaTyping(false);
-      addMessage('lia', <SuccessCelebration onReset={() => resetFlow()} />);
+      setIsLiaTyping(false); // Hide progress, show result
+      addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
     }, 7000);
   };
-
+  
   const handlePaymentResult = async (result: PaymentResult) => {
     await logPaymentEvent(result);
-    setFlowState((prev) => ({...prev, transactionId: result.reference }));
-
+    setFlowState((prev) => ({ ...prev, transactionId: result.reference }));
+  
     switch (result.status) {
       case 'APPROVED':
         await handlePaymentSuccess();
@@ -551,7 +530,7 @@ export default function TramiteFacil() {
             <p className="text-sm text-muted-foreground">Asistente LIA</p>
           </div>
         </div>
-        {currentStep > 1 ? <OverflowMenu /> : <Button variant="ghost" size="icon" onClick={() => resetFlow()}><RefreshCcw className="w-5 h-5" /></Button>}
+        {currentStep > 1 ? <OverflowMenu /> : <Button variant="ghost" size="icon" onClick={resetFlow}><RefreshCcw className="w-5 h-5" /></Button>}
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -569,28 +548,26 @@ export default function TramiteFacil() {
           ref={scrollAreaRef}
           aria-live="polite"
         >
-            {!showChatInterface && (
-                <div className="p-6">
-                    {messages.map((msg) => (
-                         <div key={msg.id}>{msg.content}</div>
-                    ))}
-                </div>
-            )}
-        
-          {showChatInterface && (
             <div className="space-y-6 p-6">
-                {getVisibleMessages().map((msg) => (
-                <ChatBubble
-                    key={msg.id}
-                    sender={msg.sender}
-                    content={msg.content}
-                />
+                {messages.map((msg) => (
+                    // When status is not 'selecting', we hide the first two messages
+                    <div key={msg.id} className={cn(showChatInterface && messages.indexOf(msg) < 2 && 'hidden')}>
+                        {msg.sender === 'lia' ? (
+                            <ChatBubble sender="lia" content={msg.content} />
+                        ) : (
+                            <ChatBubble sender="user" content={msg.content} />
+                        )}
+                    </div>
                 ))}
+
                 {isLiaTyping && flowState.status !== 'generating' && (
                 <ChatBubble
                     sender="lia"
                     content={<Loader2 className="animate-spin" />}
                 />
+                )}
+                {flowState.status === 'generating' && (
+                    <ChatBubble sender="lia" content={<DocumentGenerationProgress />} />
                 )}
                 {flowState.status === 'paying' && selectedTramite && (
                 <ChatBubble
@@ -612,13 +589,12 @@ export default function TramiteFacil() {
                     content={
                     <DocumentDownloader
                         tramiteName={selectedTramite.name}
-                        onReset={() => resetFlow()}
+                        onReset={resetFlow}
                     />
                     }
                 />
                 )}
             </div>
-          )}
         </ScrollArea>
       </CardContent>
 
@@ -632,9 +608,7 @@ export default function TramiteFacil() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => {
-                resetFlow();
-            }}
+            onClick={resetFlow}
             disabled={isLiaTyping}
             aria-label="Atrás"
             className="min-h-[44px] min-w-[44px]"

@@ -1,3 +1,4 @@
+
 'use server';
 import {firestore} from '@/server/lib/firebase';
 import {
@@ -45,7 +46,7 @@ export async function logPaymentEvent(result: PaymentResult) {
       id: result.reference,
       status: result.status.toLowerCase(),
       provider: 'mock',
-      transactionId: result.transactionId,
+      wompiId: result.transactionId,
       reason: result.reason || null,
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -53,12 +54,13 @@ export async function logPaymentEvent(result: PaymentResult) {
 
     try {
         // Using set with merge: true will create the doc if it doesn't exist,
-        // or update it if it does.
+        // or update it if it does. This handles the case where the transaction
+        // document might not have been created by a separate process.
         await setDoc(paymentRef, dataToLog, { merge: true });
     } catch (error) {
         console.error("Failed to log payment event to Firestore:", error);
         // Depending on requirements, you might want to throw this error
-        // or handle it silently.
+        // or handle it silently. For now, we'll log it and move on.
     }
 }
 
