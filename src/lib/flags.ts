@@ -1,7 +1,9 @@
 
+
+export const PAYMENT_MODE = "mock";
+
 export const usePaymentMock = () => {
-    // Hardcoded to true for testing purposes as requested.
-    return true;
+    return PAYMENT_MODE === 'mock';
 };
 
 export const fallbackToMockOnHealthFail = () => {

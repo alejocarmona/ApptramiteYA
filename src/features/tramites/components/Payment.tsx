@@ -42,7 +42,7 @@ export default function Payment({
           className="w-full justify-center border-amber-500/50 bg-amber-50 text-amber-700"
         >
           <FlaskConical className="mr-2 h-4 w-4" />
-          Modo de pruebas: el pago se simula.
+          Modo de pago: Simulado (Mock)
         </Badge>
       )}
 
