@@ -335,9 +335,9 @@ export default function TramiteFacil() {
   };
   
   const handlePay = useCallback(() => {
-    if (!selectedTramite || isProcessingPayment) return;
+    if (isProcessingPayment) return;
     
-    log('INFO', `Payment initiated for ${selectedTramite.id}. Is mock: ${isMock}`);
+    log('INFO', `Payment initiated. Is mock: ${isMock}`);
     setIsProcessingPayment(true);
     
     if (isMock) {
@@ -355,7 +355,7 @@ export default function TramiteFacil() {
         variant: 'destructive',
       });
     }
-  }, [isMock, selectedTramite, log, toast, isProcessingPayment]);
+  }, [isMock, log, toast, isProcessingPayment]);
 
   const handleCancelFlow = useCallback(async (reason?: string) => {
     log('WARN', `Flow cancellation requested. Reason: ${reason}`, {
