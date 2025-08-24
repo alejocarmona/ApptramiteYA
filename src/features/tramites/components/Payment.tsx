@@ -20,7 +20,6 @@ import type {PaymentResult} from '@/types/payment';
 type PaymentProps = {
   price: number;
   tramiteName: string;
-  formData: Record<string, string>;
   onPaymentResult: (result: PaymentResult) => void;
   onPaymentError: (message: string) => void;
 };
@@ -28,7 +27,6 @@ type PaymentProps = {
 export default function Payment({
   price,
   tramiteName,
-  formData,
   onPaymentResult,
   onPaymentError,
 }: PaymentProps) {
@@ -37,14 +35,12 @@ export default function Payment({
 
   const isMockEnabled = usePaymentMock();
 
-  const handlePayment = async () => {
+  const handlePayment = () => {
     setIsProcessing(true);
 
     if (isMockEnabled) {
       setShowMockModal(true);
-      // Processing will be set to false inside handleMockResult
     } else {
-      // Real payment logic would go here. For now, we show an error.
       onPaymentError(
         'El servicio de pago real no está implementado en este momento.'
       );
@@ -54,7 +50,7 @@ export default function Payment({
 
   const handleMockResult = (result: PaymentResult) => {
     setShowMockModal(false);
-    setIsProcessing(false); // Stop processing after mock result is received
+    setIsProcessing(false);
     onPaymentResult(result);
   };
 
@@ -77,11 +73,6 @@ export default function Payment({
       <h3 className="text-center text-lg font-bold text-foreground">
         Resumen de tu pago
       </h3>
-      <div className="text-center">
-        <Badge variant="secondary">
-          Modo de pago: {isMockEnabled ? 'Simulado' : 'Real (Wompi)'}
-        </Badge>
-      </div>
       <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Trámite: {tramiteName}</span>

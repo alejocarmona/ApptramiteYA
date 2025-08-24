@@ -27,7 +27,7 @@ import {
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
-import {TRAMITES, Tramite} from '@/features/tramites/lib/tramites';
+import {Tramite} from '@/features/tramites/lib/tramites';
 import {useToast} from '@/hooks/use-toast';
 import ChatBubble from '../ChatBubble';
 import TramiteSelector from '../TramiteSelector';
@@ -446,7 +446,7 @@ export default function TramiteFacil() {
     setCurrentField((prev) => prev + 1);
   };
   
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = useCallback(async () => {
     addMessage(
       'lia',
       <div className="flex items-center gap-2">
@@ -471,9 +471,9 @@ export default function TramiteFacil() {
       setIsLiaTyping(false); // Hide progress, show result
       addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
     }, 7000);
-  };
+  }, [addMessage, flowState.transactionId, resetFlow]);
   
-  const handlePaymentResult = async (result: PaymentResult) => {
+  const handlePaymentResult = useCallback(async (result: PaymentResult) => {
     // This is the orchestrator. It ensures operations happen in sequence.
     await logPaymentEvent(result);
     setFlowState((prev) => ({ ...prev, transactionId: result.reference }));
@@ -492,7 +492,7 @@ export default function TramiteFacil() {
         addMessage('lia', <div className="flex items-center gap-2"><XCircle className="text-destructive" /><span>Error de pago: {result.reason}</span></div>);
         break;
     }
-  };
+  }, [addMessage, handlePaymentSuccess]);
 
   const handlePaymentError = (message: string) => {
     toast({
