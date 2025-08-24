@@ -17,6 +17,7 @@ import {
   XCircle,
   AlertTriangle,
   Ban,
+  CheckCircle,
 } from 'lucide-react';
 import {
   Card,
@@ -62,7 +63,6 @@ import {buttonVariants} from '@/components/ui/button';
 import {useAppLogger} from '@/lib/logger';
 import {v4 as uuidv4} from 'uuid';
 import type {PaymentResult} from '@/types/payment';
-import PaymentMockDialog from '@/components/payments/PaymentMock';
 import {usePaymentMock} from '@/lib/flags';
 
 type Message = {
@@ -72,6 +72,32 @@ type Message = {
 };
 
 const getUniqueMessageId = () => uuidv4();
+
+const mockOptions = [
+  {
+    label: 'Pago exitoso',
+    status: 'APPROVED',
+    icon: <CheckCircle className="text-green-500" />,
+  },
+  {
+    label: 'Saldo insuficiente',
+    status: 'DECLINED',
+    icon: <AlertTriangle className="text-amber-500" />,
+    reason: 'Saldo insuficiente',
+  },
+  {
+    label: 'Cancelado por usuario',
+    status: 'CANCELLED',
+    icon: <Ban className="text-red-500" />,
+    reason: 'Pago cancelado por el usuario',
+  },
+  {
+    label: 'Error técnico',
+    status: 'ERROR',
+    icon: <XCircle className="text-destructive" />,
+    reason: 'Error técnico del procesador de pagos',
+  },
+] as const;
 
 function DocumentGenerationProgress() {
   const [progress, setProgress] = useState(10);
@@ -230,10 +256,12 @@ export default function TramiteFacil() {
   const [currentField, setCurrentField] = useState<number>(0);
   const [isLiaTyping, setIsLiaTyping] = useState<boolean>(false);
   const [userInput, setUserInput] = useState('');
-  
+
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isMockModalOpen, setIsMockModalOpen] = useState(false);
-  const [currentMockReference, setCurrentMockReference] = useState<string | null>(null);
+  const [currentMockReference, setCurrentMockReference] = useState<
+    string | null
+  >(null);
 
   const {log} = useAppLogger('TramiteFacil');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -241,12 +269,15 @@ export default function TramiteFacil() {
   const keyboardPadding = useKeyboardPadding();
   const isMock = usePaymentMock();
 
-  const addMessage = useCallback((sender: 'user' | 'lia', content: React.ReactNode) => {
-    const newMessage = {sender, content, id: getUniqueMessageId()};
-    log('INFO', `Adding message from ${sender}`, {id: newMessage.id});
-    setMessages(prev => [...prev, newMessage]);
-  }, [log]);
-  
+  const addMessage = useCallback(
+    (sender: 'user' | 'lia', content: React.ReactNode) => {
+      const newMessage = {sender, content, id: getUniqueMessageId()};
+      log('INFO', `Adding message from ${sender}`, {id: newMessage.id});
+      setMessages(prev => [...prev, newMessage]);
+    },
+    [log]
+  );
+
   const resetFlow = useCallback(() => {
     log('INFO', 'Resetting flow.');
     setFlowState(initialFlow);
@@ -258,19 +289,22 @@ export default function TramiteFacil() {
     setMessages([]);
   }, [log]);
 
-  const handleTramiteSelect = useCallback((tramite: Tramite) => {
-    log('INFO', `Tramite selected: ${tramite.id}`);
-    setMessages(currentMessages => currentMessages.slice(0, 1));
-    addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
-    setSelectedTramite(tramite);
-    setCurrentField(0);
-    setFormData({});
-    setFlowState({
-      step: 2,
-      status: 'filling',
-      tramiteId: tramite.id,
-    });
-  }, [addMessage, log]);
+  const handleTramiteSelect = useCallback(
+    (tramite: Tramite) => {
+      log('INFO', `Tramite selected: ${tramite.id}`);
+      setMessages(currentMessages => currentMessages.slice(0, 1));
+      addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
+      setSelectedTramite(tramite);
+      setCurrentField(0);
+      setFormData({});
+      setFlowState({
+        step: 2,
+        status: 'filling',
+        tramiteId: tramite.id,
+      });
+    },
+    [addMessage, log]
+  );
 
   const startInitialFlow = useCallback(() => {
     log('INFO', 'Starting initial flow.');
@@ -278,7 +312,9 @@ export default function TramiteFacil() {
       'lia',
       <WelcomeHero
         onStart={() =>
-          document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'})
+          document
+            .getElementById('tramite-selector')
+            ?.scrollIntoView({behavior: 'smooth'})
         }
       />
     );
@@ -288,7 +324,7 @@ export default function TramiteFacil() {
         <TramiteSelector onSelect={handleTramiteSelect} />
       </div>
     );
-  },[addMessage, log, handleTramiteSelect]);
+  }, [addMessage, log, handleTramiteSelect]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -296,43 +332,67 @@ export default function TramiteFacil() {
     }
   }, [messages.length, startInitialFlow]);
 
-  const handlePaymentResult = useCallback(async (result: PaymentResult) => {
-    setIsProcessingPayment(false);
-    log('INFO', 'Received payment result in main component.', {result});
-    await logPaymentEvent(result);
-    setFlowState((prev) => ({...prev, transactionId: result.reference}));
+  const handlePaymentResult = useCallback(
+    async (result: PaymentResult) => {
+      setIsProcessingPayment(false);
+      log('INFO', 'Received payment result in main component.', {result});
+      await logPaymentEvent(result);
+      setFlowState(prev => ({...prev, transactionId: result.reference}));
 
-    if (result.status === 'APPROVED') {
-      log('SUCCESS', 'Payment approved, handling success.', {result});
-      addMessage(
-        'lia',
-        <div className="flex items-center gap-2">
-          <Sparkles className="text-green-500" />
-          <span>Pago aprobado. ¡Gracias!</span>
-        </div>
-      );
-      setFlowState(prev => ({...prev, step: 4, status: 'generating'}));
-    } else {
-      log('ERROR', 'Payment failed or was declined.', {result});
-      const content = {
-        DECLINED: <div className="flex items-center gap-2"><AlertTriangle className="text-amber-500" /><span>Pago rechazado: {result.reason}</span></div>,
-        CANCELLED: <div className="flex items-center gap-2"><Ban className="text-red-500" /><span>{result.reason}</span></div>,
-        ERROR: <div className="flex items-center gap-2"><XCircle className="text-destructive" /><span>Error de pago: {result.reason}</span></div>
-      };
-      addMessage('lia', content[result.status] || content['ERROR']);
-    }
-  }, [addMessage, log]);
-
-  const handleMockResult = (result: Omit<PaymentResult, 'reference'>) => {
-    log('INFO', 'Received result from mock dialog.', {result});
-    if (currentMockReference) {
-      handlePaymentResult({...result, reference: currentMockReference});
-    } else {
-      log('ERROR', 'Mock result received but no reference was stored.');
-    }
-    setIsMockModalOpen(false);
-    setCurrentMockReference(null);
-  };
+      if (result.status === 'APPROVED') {
+        log('SUCCESS', 'Payment approved, handling success.', {result});
+        addMessage(
+          'lia',
+          <div className="flex items-center gap-2">
+            <Sparkles className="text-green-500" />
+            <span>Pago aprobado. ¡Gracias!</span>
+          </div>
+        );
+        setFlowState(prev => ({...prev, step: 4, status: 'generating'}));
+      } else {
+        log('ERROR', 'Payment failed or was declined.', {result});
+        const content = {
+          DECLINED: (
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500" />
+              <span>Pago rechazado: {result.reason}</span>
+            </div>
+          ),
+          CANCELLED: (
+            <div className="flex items-center gap-2">
+              <Ban className="text-red-500" />
+              <span>{result.reason}</span>
+            </div>
+          ),
+          ERROR: (
+            <div className="flex items-center gap-2">
+              <XCircle className="text-destructive" />
+              <span>Error de pago: {result.reason}</span>
+            </div>
+          ),
+        };
+        addMessage('lia', content[result.status] || content['ERROR']);
+      }
+    },
+    [addMessage, log]
+  );
+  
+  const handleMockResult = useCallback(
+    (result: Omit<PaymentResult, 'reference'>) => {
+      log('INFO', 'Received result from mock dialog.', {
+        result,
+        currentMockReference,
+      });
+      if (currentMockReference) {
+        handlePaymentResult({...result, reference: currentMockReference});
+      } else {
+        log('ERROR', 'Mock result received but no reference was stored.');
+      }
+      setIsMockModalOpen(false);
+      setCurrentMockReference(null);
+    },
+    [currentMockReference, handlePaymentResult, log]
+  );
   
   const handlePay = useCallback(() => {
     if (isProcessingPayment) return;
@@ -357,24 +417,27 @@ export default function TramiteFacil() {
     }
   }, [isMock, log, toast, isProcessingPayment]);
 
-  const handleCancelFlow = useCallback(async (reason?: string) => {
-    log('WARN', `Flow cancellation requested. Reason: ${reason}`, {
-      transactionId: flowState.transactionId,
-    });
-    if (flowState.transactionId) {
-      try {
-        await cancelTransaction(flowState.transactionId, reason);
-        log('SUCCESS', 'Transaction cancelled in backend.');
-      } catch (error) {
-        log('ERROR', 'Failed to cancel transaction in backend.', {error});
+  const handleCancelFlow = useCallback(
+    async (reason?: string) => {
+      log('WARN', `Flow cancellation requested. Reason: ${reason}`, {
+        transactionId: flowState.transactionId,
+      });
+      if (flowState.transactionId) {
+        try {
+          await cancelTransaction(flowState.transactionId, reason);
+          log('SUCCESS', 'Transaction cancelled in backend.');
+        } catch (error) {
+          log('ERROR', 'Failed to cancel transaction in backend.', {error});
+        }
       }
-    }
-    resetFlow();
-    toast({
-      title: 'Proceso cancelado',
-      description: 'Puedes iniciar un nuevo trámite cuando quieras.',
-    });
-  }, [flowState.transactionId, resetFlow, toast, log]);
+      resetFlow();
+      toast({
+        title: 'Proceso cancelado',
+        description: 'Puedes iniciar un nuevo trámite cuando quieras.',
+      });
+    },
+    [flowState.transactionId, resetFlow, toast, log]
+  );
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -398,44 +461,79 @@ export default function TramiteFacil() {
     const isLiaTurn = !lastMessage || lastMessage.sender === 'user';
 
     // Step 2: Filling form data
-    if (flowState.status === 'filling' && selectedTramite && isLiaTurn && !isLiaTyping) {
-      const allFieldsFilled = currentField >= selectedTramite.dataRequirements.length;
+    if (
+      flowState.status === 'filling' &&
+      selectedTramite &&
+      isLiaTurn &&
+      !isLiaTyping
+    ) {
+      const allFieldsFilled =
+        currentField >= selectedTramite.dataRequirements.length;
 
       if (allFieldsFilled) {
         log('INFO', 'All fields filled, moving to payment.');
-        setFlowState(prev => ({ ...prev, step: 3, status: 'paying' }));
+        setFlowState(prev => ({...prev, step: 3, status: 'paying'}));
         return;
       }
 
       setIsLiaTyping(true);
       setTimeout(() => {
         if (currentField === 0) {
-          addMessage('lia', <>
+          addMessage(
+            'lia',
+            <>
               <p>¡Excelente elección!</p>
-              <p>Para el <strong>{selectedTramite.name}</strong>, necesitaré algunos datos.</p>
-              <p className="mt-2">{selectedTramite.dataRequirements[currentField].label}:</p>
-            </>);
+              <p>
+                Para el <strong>{selectedTramite.name}</strong>, necesitaré
+                algunos datos.
+              </p>
+              <p className="mt-2">
+                {selectedTramite.dataRequirements[currentField].label}:
+              </p>
+            </>
+          );
         } else {
-          addMessage('lia', `Por favor, ingresa tu ${selectedTramite.dataRequirements[currentField].label.toLowerCase()}:`);
+          addMessage(
+            'lia',
+            `Por favor, ingresa tu ${selectedTramite.dataRequirements[
+              currentField
+            ].label.toLowerCase()}:`
+          );
         }
         setIsLiaTyping(false);
       }, 500);
     }
-    
-    const lastMessageIsPayment = lastMessage?.content && typeof lastMessage.content === 'object' && React.isValidElement(lastMessage.content) && lastMessage.content.type === Payment;
+
+    const lastMessageIsPayment =
+      lastMessage?.content &&
+      typeof lastMessage.content === 'object' &&
+      React.isValidElement(lastMessage.content) &&
+      lastMessage.content.type === Payment;
     if (flowState.status === 'paying' && selectedTramite && !lastMessageIsPayment) {
-       addMessage('lia', <div className="flex items-center gap-2"> <CheckCircle2 className="text-green-500" /> <span>¡Perfecto! Hemos reunido toda la información.</span> </div>);
-       addMessage('lia', 
-         <Payment 
-            tramiteName={selectedTramite.name} 
-            price={selectedTramite.priceCop} 
-            onPay={handlePay} 
-            isProcessing={isProcessingPayment} 
-          />
-       );
+      addMessage(
+        'lia',
+        <div className="flex items-center gap-2">
+          {' '}
+          <CheckCircle2 className="text-green-500" />{' '}
+          <span>¡Perfecto! Hemos reunido toda la información.</span>{' '}
+        </div>
+      );
+      addMessage(
+        'lia',
+        <Payment
+          tramiteName={selectedTramite.name}
+          price={selectedTramite.priceCop}
+          onPay={handlePay}
+          isProcessing={isProcessingPayment}
+        />
+      );
     }
 
-    const lastMessageIsProgress = lastMessage?.content && typeof lastMessage.content === 'object' && React.isValidElement(lastMessage.content) && lastMessage.content.type === DocumentGenerationProgress;
+    const lastMessageIsProgress =
+      lastMessage?.content &&
+      typeof lastMessage.content === 'object' &&
+      React.isValidElement(lastMessage.content) &&
+      lastMessage.content.type === DocumentGenerationProgress;
     if (flowState.status === 'generating' && !lastMessageIsProgress) {
       addMessage('lia', <DocumentGenerationProgress />);
       setTimeout(async () => {
@@ -443,23 +541,36 @@ export default function TramiteFacil() {
         setFlowState(prev => ({...prev, status: 'completed'}));
       }, 7000);
     }
-    
-    const lastMessageIsDownloader = lastMessage?.content && typeof lastMessage.content === 'object' && React.isValidElement(lastMessage.content) && lastMessage.content.type === DocumentDownloader;
-    if (flowState.status === 'completed' && selectedTramite && !lastMessageIsDownloader) {
-        addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
-        addMessage('lia', <DocumentDownloader tramiteName={selectedTramite.name} onReset={resetFlow} />);
-    }
 
+    const lastMessageIsDownloader =
+      lastMessage?.content &&
+      typeof lastMessage.content === 'object' &&
+      React.isValidElement(lastMessage.content) &&
+      lastMessage.content.type === DocumentDownloader;
+    if (
+      flowState.status === 'completed' &&
+      selectedTramite &&
+      !lastMessageIsDownloader
+    ) {
+      addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
+      addMessage(
+        'lia',
+        <DocumentDownloader
+          tramiteName={selectedTramite.name}
+          onReset={resetFlow}
+        />
+      );
+    }
   }, [
-    flowState.status, 
-    flowState.step, 
-    messages, 
-    selectedTramite, 
-    currentField, 
-    isLiaTyping, 
-    addMessage, 
-    resetFlow, 
-    log, 
+    flowState.status,
+    flowState.step,
+    messages,
+    selectedTramite,
+    currentField,
+    isLiaTyping,
+    addMessage,
+    resetFlow,
+    log,
     handlePay,
     isProcessingPayment,
   ]);
@@ -478,7 +589,7 @@ export default function TramiteFacil() {
     setIsMockModalOpen(false);
     setIsProcessingPayment(false); // Also reset processing state
     if (currentMockReference) {
-       handlePaymentResult({
+      handlePaymentResult({
         status: 'CANCELLED',
         reference: currentMockReference,
         transactionId: `mock_${Math.random().toString(36).slice(2, 10)}`,
@@ -497,10 +608,12 @@ export default function TramiteFacil() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => {
-            log('INFO', 'User selected "Change tramite" from menu.');
-            resetFlow();
-          }}>
+          <DropdownMenuItem
+            onSelect={() => {
+              log('INFO', 'User selected "Change tramite" from menu.');
+              resetFlow();
+            }}
+          >
             Cambiar trámite
           </DropdownMenuItem>
           <AlertDialogTrigger asChild>
@@ -546,21 +659,51 @@ export default function TramiteFacil() {
       </AlertDialogContent>
     </AlertDialog>
   );
-  
+
   const getVisibleMessages = () => {
     if (flowState.step === 1) {
-        return messages.slice(0, 2);
+      return messages.slice(0, 2);
     }
     return messages.slice(1);
   };
 
   return (
     <>
-      <PaymentMockDialog
-        open={isMockModalOpen}
-        onClose={handleMockClose}
-        onResult={handleMockResult}
-      />
+      <AlertDialog open={isMockModalOpen} onOpenChange={setIsMockModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mock de Pago</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este es un simulador de pagos. Selecciona un resultado para
+              continuar con el flujo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col space-y-2 py-4">
+            {mockOptions.map(option => (
+              <Button
+                key={option.status}
+                variant="outline"
+                className="h-auto min-h-[44px] justify-start text-left"
+                onClick={() => handleMockResult(option)}
+              >
+                <div className="mr-3">{option.icon}</div>
+                <div className="flex flex-col">
+                  <span className="font-semibold">{option.label}</span>
+                  {option.reason && (
+                    <span className="text-xs text-muted-foreground">
+                      {option.reason}
+                    </span>
+                  )}
+                </div>
+              </Button>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleMockClose}>Cerrar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Card
         className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl"
         style={{paddingBottom: keyboardPadding}}
@@ -623,9 +766,7 @@ export default function TramiteFacil() {
         </CardContent>
 
         {flowState.status === 'filling' && (
-          <div
-            className="sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-bottom:env(safe-area-inset-bottom)]"
-          >
+          <div className="sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-bottom:env(safe-area-inset-bottom)]">
             <div className="flex w-full items-center space-x-2">
               <Button
                 variant="outline"
