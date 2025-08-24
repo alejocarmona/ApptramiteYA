@@ -66,13 +66,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {buttonVariants} from '@/components/ui/button';
 import {useAppLogger} from '@/lib/logger';
 import {v4 as uuidv4} from 'uuid';
 import type {PaymentResult} from '@/types/payment';
-import {usePaymentMock} from '@/lib/flags';
+import {PAYMENT_MODE} from '@/lib/flags';
+import PaymentMockDialog from '@/features/tramites/components/PaymentMockDialog';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -80,32 +80,9 @@ type Message = {
   id: string;
 };
 
-type MockResult = "success" | "insufficient" | "canceled" | "error";
+type MockResult = 'success' | 'insufficient' | 'canceled' | 'error';
 
 const getUniqueMessageId = () => uuidv4();
-
-const mockOptions = [
-  {
-    label: 'Pago exitoso',
-    result: 'success',
-    icon: <CheckCircle className="text-green-500" />,
-  },
-  {
-    label: 'Saldo insuficiente',
-    result: 'insufficient',
-    icon: <AlertTriangle className="text-amber-500" />,
-  },
-  {
-    label: 'Cancelado por usuario',
-    result: 'canceled',
-    icon: <Ban className="text-red-500" />,
-  },
-  {
-    label: 'Error técnico',
-    result: 'error',
-    icon: <XCircle className="text-destructive" />,
-  },
-] as const;
 
 function DocumentGenerationProgress() {
   const [progress, setProgress] = useState(10);
@@ -256,58 +233,6 @@ function SuccessCelebration({onReset}: {onReset: () => void}) {
   );
 }
 
-type PaymentMockDialogProps = {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  onResult: (result: MockResult) => void;
-};
-
-function PaymentMockDialog({ isOpen, onOpenChange, onResult }: PaymentMockDialogProps) {
-  const handleSelect = (result: MockResult) => {
-    onResult(result);
-    onOpenChange(false);
-  };
-
-  return (
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent
-          onEscapeKeyDown={() => handleSelect('canceled')}
-          onPointerDownOutside={() => handleSelect('canceled')}
-        >
-          <DialogHeader>
-            <DialogTitle>Mock de Pago</DialogTitle>
-            <DialogDescription>
-              Este es un simulador de pagos. Selecciona un resultado para
-              continuar con el flujo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col space-y-2 py-4">
-            {mockOptions.map(option => (
-              <Button
-                key={option.result}
-                variant="outline"
-                className="h-auto min-h-[44px] justify-start text-left"
-                onClick={() => handleSelect(option.result)}
-              >
-                <div className="mr-3">{option.icon}</div>
-                <div className="flex flex-col">
-                  <span className="font-semibold">{option.label}</span>
-                </div>
-              </Button>
-            ))}
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" onClick={() => handleSelect('canceled')}>
-                Cerrar
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-  );
-}
-
 export default function TramiteFacil() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [flowState, setFlowState] = useState<FlowContext>(initialFlow);
@@ -324,7 +249,6 @@ export default function TramiteFacil() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
   const keyboardPadding = useKeyboardPadding();
-  const isMock = usePaymentMock();
 
   const addMessage = useCallback(
     (sender: 'user' | 'lia', content: React.ReactNode) => {
@@ -383,47 +307,63 @@ export default function TramiteFacil() {
   }, [addMessage, log]);
 
 
-  const handleMockResult = useCallback((result: MockResult) => {
-    setIsProcessingPayment(false);
-    log('INFO', `Mock payment result: ${result}`);
-
-    const reference = `mock_${uuidv4()}`;
-
-    switch (result) {
-      case 'success':
-        handlePaymentResult({
-          status: 'APPROVED',
-          reference,
-          transactionId: `wompi_${uuidv4()}`
-        });
-        break;
-      
-      case 'insufficient':
-        toast({
-          variant: 'destructive',
-          title: 'Error de pago',
-          description: 'Saldo insuficiente. Por favor, intenta con otro método de pago.',
-        });
-        break;
-        
-      case 'error':
-        toast({
-          variant: 'destructive',
-          title: 'Error de pago',
-          description: 'Ocurrió un error técnico. Por favor, reintenta en unos momentos.',
-        });
-        break;
-
-      case 'canceled':
-        addMessage('lia', 'Pago cancelado por el usuario.');
-        break;
-    }
-  }, [addMessage, handlePaymentResult, log, toast]);
+  const handleMockResult = useCallback(async (result: MockResult) => {
+      log('INFO', 'Mock payment result received.', {
+        modo: 'mock',
+        result,
+        tramite: selectedTramite?.name,
+        timestamp: new Date().toISOString(),
+      });
+  
+      setIsProcessingPayment(false);
+  
+      switch (result) {
+        case 'success':
+          const mockReference = `mock_${uuidv4()}`;
+          // Immediately call the handler that continues the flow
+          await handlePaymentResult({
+            status: 'APPROVED',
+            reference: mockReference,
+            transactionId: `wompi_mock_${uuidv4()}`,
+          });
+          // This simulates the webhook call
+          await fetch('/api/webhooks/wompi', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  data: {
+                      transaction: {
+                          transactionId: mockReference,
+                          wompiId: `wompi_mock_${uuidv4()}`
+                      }
+                  }
+              })
+          });
+          break;
+        case 'insufficient':
+          toast({
+            variant: 'destructive',
+            title: 'Saldo Insuficiente',
+            description: 'La transacción fue rechazada por fondos insuficientes.',
+          });
+          break;
+        case 'error':
+          toast({
+            variant: 'destructive',
+            title: 'Error de Pago',
+            description: 'Ocurrió un error técnico durante el pago.',
+          });
+          break;
+        case 'canceled':
+          addMessage('lia', 'El pago fue cancelado por el usuario.');
+          break;
+      }
+    }, [addMessage, handlePaymentResult, log, toast, selectedTramite]);
 
 
   const handlePay = useCallback(async () => {
     setIsProcessingPayment(true);
-    if (isMock) {
+    if (PAYMENT_MODE === 'mock') {
       log('INFO', 'Initiating MOCK payment...');
       setIsMockModalOpen(true);
     } else {
@@ -435,7 +375,7 @@ export default function TramiteFacil() {
       });
       setIsProcessingPayment(false);
     }
-  }, [isMock, log, toast]);
+  }, [log, toast]);
 
 
   const resetFlow = useCallback(() => {
@@ -839,3 +779,5 @@ export default function TramiteFacil() {
     </>
   );
 }
+
+    

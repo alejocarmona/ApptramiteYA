@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
-import {usePaymentMock} from '@/lib/flags';
+import {PAYMENT_MODE} from '@/lib/flags';
 
 type PaymentProps = {
   price: number;
@@ -28,7 +28,7 @@ export default function Payment({
   onPay,
   isProcessing,
 }: PaymentProps) {
-  const isMockEnabled = usePaymentMock();
+  const isMockEnabled = PAYMENT_MODE === 'mock';
 
   const serviceFee = 2500;
   const iva = (price + serviceFee) * 0.19;
@@ -136,3 +136,5 @@ export default function Payment({
     </div>
   );
 }
+
+    
