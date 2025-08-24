@@ -241,9 +241,10 @@ export default function TramiteFacil() {
     log('INFO', `Adding message from ${sender}`, {id: newMessage.id});
     setMessages(prev => [...prev, newMessage]);
   }, [log]);
-
+  
   const handleTramiteSelect = useCallback((tramite: Tramite) => {
     log('INFO', `Tramite selected: ${tramite.id}`);
+    // Clear all messages except the very first one (the welcome hero)
     setMessages(currentMessages => currentMessages.slice(0, 1));
     addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
     setSelectedTramite(tramite);
@@ -285,6 +286,7 @@ export default function TramiteFacil() {
     setUserInput('');
     startInitialFlow();
   }, [startInitialFlow, log]);
+
 
   const handlePaymentResult = useCallback(async (result: PaymentResult) => {
     log('INFO', 'Received payment result in main component.', {result});
@@ -357,11 +359,6 @@ export default function TramiteFacil() {
     const flowId = `${flowState.status}-${flowState.step}`;
     log('INFO', `Flow updated: ${flowId}`, {currentField, isLiaTyping});
 
-    // Step 1: Initial state
-    if (flowState.status === 'idle') {
-      resetFlow();
-    }
-    
     // Step 2: Filling form data
     if (flowState.status === 'filling' && selectedTramite) {
       const allFieldsFilled = currentField >= selectedTramite.dataRequirements.length;
@@ -395,8 +392,9 @@ export default function TramiteFacil() {
     // Step 3: Waiting for payment
     if (flowState.status === 'paying' && selectedTramite) {
       const lastMessageContent = messages[messages.length - 1]?.content;
-      if (typeof lastMessageContent === 'object' && (lastMessageContent as React.ReactElement)?.type === Payment) {
-        return; // Payment component already shown
+      // Ensure we only add the payment component once
+      if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === Payment) {
+        return; 
       }
        addMessage('lia', <div className="flex items-center gap-2"> <CheckCircle2 className="text-green-500" /> <span>¡Perfecto! Hemos reunido toda la información.</span> </div>);
        addMessage('lia', 
@@ -418,7 +416,7 @@ export default function TramiteFacil() {
     // Step 4: Generating document
     if (flowState.status === 'generating') {
       const lastMessageContent = messages[messages.length - 1]?.content;
-      if (typeof lastMessageContent === 'object' && (lastMessageContent as React.ReactElement)?.type === DocumentGenerationProgress) {
+      if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === DocumentGenerationProgress) {
         return; // Already showing progress
       }
       addMessage('lia', <DocumentGenerationProgress />);
@@ -432,10 +430,11 @@ export default function TramiteFacil() {
     // Step 4: Completed
     if (flowState.status === 'completed' && selectedTramite) {
        const lastMessageContent = messages[messages.length - 1]?.content;
-       if (typeof lastMessageContent === 'object' && (lastMessageContent as React.ReactElement)?.type === DocumentGenerationProgress) {
-          addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
-          addMessage('lia', <DocumentDownloader tramiteName={selectedTramite.name} onReset={resetFlow} />);
+       if (typeof lastMessageContent === 'object' && React.isValidElement(lastMessageContent) && lastMessageContent.type === DocumentDownloader) {
+          return; // Already shown
        }
+        addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
+        addMessage('lia', <DocumentDownloader tramiteName={selectedTramite.name} onReset={resetFlow} />);
     }
 
   }, [
@@ -453,7 +452,7 @@ export default function TramiteFacil() {
     formData,
   ]);
 
-
+  // Effect to run only once on mount
   useEffect(() => {
     startInitialFlow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -529,9 +528,12 @@ export default function TramiteFacil() {
   );
   
   const getVisibleMessages = () => {
-    if (flowState.step === 1 && messages.length > 1) {
+    // In step 1, show only the first two messages (Welcome + Selector)
+    if (flowState.step === 1) {
         return messages.slice(0, 2);
     }
+    // After step 1, hide the welcome message but keep the selector if needed or just the flow.
+    // This logic ensures the initial components don't reappear incorrectly.
     return messages.slice(1);
   };
 
@@ -646,3 +648,5 @@ export default function TramiteFacil() {
     </>
   );
 }
+
+    
