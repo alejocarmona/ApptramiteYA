@@ -49,15 +49,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -66,6 +57,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {buttonVariants} from '@/components/ui/button';
 import {useAppLogger} from '@/lib/logger';
@@ -725,13 +717,14 @@ export default function TramiteFacil() {
                   content={<Loader2 className="animate-spin" />}
                 />
               )}
+
+              {flowState.status === 'generating' && (
+                <div className="border-t p-4">
+                  <DocumentGenerationProgress />
+                </div>
+              )}
             </div>
           </ScrollArea>
-           {flowState.status === 'generating' && (
-            <div className="border-t p-4">
-              <DocumentGenerationProgress />
-            </div>
-          )}
         </CardContent>
 
         {flowState.status === 'filling' && (
@@ -779,5 +772,3 @@ export default function TramiteFacil() {
     </>
   );
 }
-
-    
