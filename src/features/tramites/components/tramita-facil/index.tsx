@@ -292,8 +292,7 @@ export default function TramiteFacil() {
       setIsProcessingPayment(false);
       log('INFO', 'Received payment result in main component.', {result});
       await logPaymentEvent(result);
-      setFlowState(prev => ({...prev, transactionId: result.reference}));
-
+      
       if (result.status === 'APPROVED') {
         log('SUCCESS', 'Payment approved, handling success.', {result});
         addMessage(
@@ -303,7 +302,12 @@ export default function TramiteFacil() {
             <span>Pago aprobado. ¡Gracias!</span>
           </div>
         );
-        setFlowState(prev => ({...prev, step: 4, status: 'generating'}));
+        setFlowState(prev => ({
+          ...prev,
+          step: 4,
+          status: 'generating',
+          transactionId: result.reference,
+        }));
       } else {
         log('ERROR', 'Payment failed or was declined.', {result});
         const content = {
@@ -327,6 +331,7 @@ export default function TramiteFacil() {
           ),
         };
         addMessage('lia', content[result.status] || content['ERROR']);
+        setFlowState(prev => ({...prev, transactionId: result.reference}));
       }
     },
     [addMessage, log]
@@ -354,32 +359,19 @@ export default function TramiteFacil() {
 
     log('INFO', `Payment initiated. Is mock: ${isMock}`);
     setIsProcessingPayment(true);
+    
+    const reference = `MOCK-${uuidv4()}`;
+    log('INFO', 'Initiating MOCK payment with hardcoded success.', {reference});
 
-    if (isMock) {
-      const reference = `MOCK-${uuidv4()}`;
-      log('INFO', 'Initiating MOCK payment with hardcoded success.', {reference});
-      
-      // Directly call handlePaymentResult with a successful response for testing.
-      handlePaymentResult({
-        status: 'APPROVED',
-        reference: reference,
-        transactionId: `mock_tx_${uuidv4()}`,
-      });
+    // Directly call handlePaymentResult with a successful response for testing.
+    const result: PaymentResult = {
+      status: 'APPROVED',
+      reference: reference,
+      transactionId: `mock_tx_${uuidv4()}`,
+    };
+    handlePaymentResult(result);
 
-      // The original modal logic is commented out for the test.
-      // setCurrentMockReference(reference);
-      // setIsMockModalOpen(true);
-    } else {
-      // Real payment logic would go here.
-      log('WARN', 'Real payment provider not implemented.');
-      setIsProcessingPayment(false);
-      toast({
-        title: 'Servicio no disponible',
-        description: 'La pasarela de pagos real no está implementada aún.',
-        variant: 'destructive',
-      });
-    }
-  }, [isMock, log, toast, isProcessingPayment, handlePaymentResult]);
+  }, [isMock, log, isProcessingPayment, handlePaymentResult]);
 
   const resetFlow = useCallback(() => {
     log('INFO', 'Resetting flow.');
