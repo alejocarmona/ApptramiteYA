@@ -17,7 +17,6 @@ import {
   XCircle,
   AlertTriangle,
   Ban,
-  CheckCircle,
 } from 'lucide-react';
 import {
   Card,
@@ -299,7 +298,8 @@ export default function TramiteFacil() {
   }, [addMessage, log]);
 
 
-  const handleMockResult = useCallback(async (result: MockResult) => {
+  const handleMockResult = useCallback(
+    async (result: MockResult) => {
       log('INFO', 'Mock payment result received.', {
         modo: 'mock',
         result,
@@ -308,30 +308,36 @@ export default function TramiteFacil() {
       });
   
       setIsProcessingPayment(false);
+      setIsMockModalOpen(false);
   
       switch (result) {
-        case 'success':
+        case 'success': {
           const mockReference = `mock_${uuidv4()}`;
-          // Immediately call the handler that continues the flow
+          toast({
+            title: 'Éxito (Simulado)',
+            description: 'Pago aprobado (simulado).',
+          });
+          
           await handlePaymentResult({
             status: 'APPROVED',
             reference: mockReference,
             transactionId: `wompi_mock_${uuidv4()}`,
           });
-          // This simulates the webhook call
+
           await fetch('/api/webhooks/wompi', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  data: {
-                      transaction: {
-                          transactionId: mockReference,
-                          wompiId: `wompi_mock_${uuidv4()}`
-                      }
-                  }
-              })
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              data: {
+                transaction: {
+                  transactionId: mockReference,
+                  wompiId: `wompi_mock_${uuidv4()}`,
+                },
+              },
+            }),
           });
           break;
+        }
         case 'insufficient':
           toast({
             variant: 'destructive',
@@ -350,7 +356,9 @@ export default function TramiteFacil() {
           addMessage('lia', 'El pago fue cancelado por el usuario.');
           break;
       }
-    }, [addMessage, handlePaymentResult, log, toast, selectedTramite]);
+    },
+    [addMessage, handlePaymentResult, log, toast, selectedTramite]
+  );
 
 
   const handlePay = useCallback(async () => {
