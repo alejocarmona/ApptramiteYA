@@ -649,3 +649,5 @@ export default function TramiteFacil() {
     </Card>
   );
 }
+
+    
