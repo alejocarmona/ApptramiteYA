@@ -80,31 +80,30 @@ type Message = {
   id: string;
 };
 
+type MockResult = "success" | "insufficient" | "canceled" | "error";
+
 const getUniqueMessageId = () => uuidv4();
 
 const mockOptions = [
   {
     label: 'Pago exitoso',
-    status: 'APPROVED',
+    result: 'success',
     icon: <CheckCircle className="text-green-500" />,
   },
   {
     label: 'Saldo insuficiente',
-    status: 'DECLINED',
+    result: 'insufficient',
     icon: <AlertTriangle className="text-amber-500" />,
-    reason: 'Saldo insuficiente',
   },
   {
     label: 'Cancelado por usuario',
-    status: 'CANCELLED',
+    result: 'canceled',
     icon: <Ban className="text-red-500" />,
-    reason: 'Pago cancelado por el usuario',
   },
   {
     label: 'Error técnico',
-    status: 'ERROR',
+    result: 'error',
     icon: <XCircle className="text-destructive" />,
-    reason: 'Error técnico del procesador de pagos',
   },
 ] as const;
 
@@ -257,6 +256,58 @@ function SuccessCelebration({onReset}: {onReset: () => void}) {
   );
 }
 
+type PaymentMockDialogProps = {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  onResult: (result: MockResult) => void;
+};
+
+function PaymentMockDialog({ isOpen, onOpenChange, onResult }: PaymentMockDialogProps) {
+  const handleSelect = (result: MockResult) => {
+    onResult(result);
+    onOpenChange(false);
+  };
+
+  return (
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent
+          onEscapeKeyDown={() => handleSelect('canceled')}
+          onPointerDownOutside={() => handleSelect('canceled')}
+        >
+          <DialogHeader>
+            <DialogTitle>Mock de Pago</DialogTitle>
+            <DialogDescription>
+              Este es un simulador de pagos. Selecciona un resultado para
+              continuar con el flujo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col space-y-2 py-4">
+            {mockOptions.map(option => (
+              <Button
+                key={option.result}
+                variant="outline"
+                className="h-auto min-h-[44px] justify-start text-left"
+                onClick={() => handleSelect(option.result)}
+              >
+                <div className="mr-3">{option.icon}</div>
+                <div className="flex flex-col">
+                  <span className="font-semibold">{option.label}</span>
+                </div>
+              </Button>
+            ))}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" onClick={() => handleSelect('canceled')}>
+                Cerrar
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+  );
+}
+
 export default function TramiteFacil() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [flowState, setFlowState] = useState<FlowContext>(initialFlow);
@@ -268,9 +319,6 @@ export default function TramiteFacil() {
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isMockModalOpen, setIsMockModalOpen] = useState(false);
-  const [currentMockReference, setCurrentMockReference] = useState<
-    string | null
-  >(null);
 
   const {log} = useAppLogger('TramiteFacil');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -286,78 +334,109 @@ export default function TramiteFacil() {
     },
     [log]
   );
-
-  const handlePaymentResult = useCallback(
-    async (result: PaymentResult) => {
-      setIsProcessingPayment(false);
-      log('INFO', 'Received payment result in main component.', {result});
-      await logPaymentEvent(result);
-
-      if (result.status === 'APPROVED') {
-        log('SUCCESS', 'Payment approved, handling success.', {result});
-        addMessage(
-          'lia',
+  
+  const handlePaymentResult = useCallback(async (result: PaymentResult) => {
+    setIsProcessingPayment(false);
+    log('INFO', 'Received payment result in main component.', { result });
+    await logPaymentEvent(result);
+  
+    if (result.status === 'APPROVED') {
+      log('SUCCESS', 'Payment approved, handling success.', { result });
+      addMessage(
+        'lia',
+        <div className="flex items-center gap-2">
+          <Sparkles className="text-green-500" />
+          <span>Pago aprobado. ¡Gracias!</span>
+        </div>
+      );
+      setFlowState(prev => ({
+        ...prev,
+        step: 4,
+        status: 'generating',
+        transactionId: result.reference,
+      }));
+    } else {
+      const reason = result.reason || 'No se proporcionó un motivo.';
+      const content = {
+        DECLINED: (
           <div className="flex items-center gap-2">
-            <Sparkles className="text-green-500" />
-            <span>Pago aprobado. ¡Gracias!</span>
+            <AlertTriangle className="text-amber-500" />
+            <span>Pago rechazado: {reason}</span>
           </div>
-        );
-        setFlowState(prev => ({
-          ...prev,
-          step: 4,
-          status: 'generating',
-          transactionId: result.reference,
-        }));
-      } else {
-        log('ERROR', 'Payment failed or was declined.', {result});
-        const content = {
-          DECLINED: (
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="text-amber-500" />
-              <span>Pago rechazado: {result.reason}</span>
-            </div>
-          ),
-          CANCELLED: (
-            <div className="flex items-center gap-2">
-              <Ban className="text-red-500" />
-              <span>{result.reason}</span>
-            </div>
-          ),
-          ERROR: (
-            <div className="flex items-center gap-2">
-              <XCircle className="text-destructive" />
-              <span>Error de pago: {result.reason}</span>
-            </div>
-          ),
-        };
-        addMessage('lia', content[result.status] || content['ERROR']);
-        setFlowState(prev => ({...prev, transactionId: result.reference}));
-      }
-    },
-    [addMessage, log]
-  );
+        ),
+        CANCELLED: (
+          <div className="flex items-center gap-2">
+            <Ban className="text-red-500" />
+            <span>{reason}</span>
+          </div>
+        ),
+        ERROR: (
+          <div className="flex items-center gap-2">
+            <XCircle className="text-destructive" />
+            <span>Error de pago: {reason}</span>
+          </div>
+        ),
+      };
+      addMessage('lia', content[result.status] || content['ERROR']);
+      setFlowState(prev => ({ ...prev, transactionId: result.reference }));
+    }
+  }, [addMessage, log]);
 
-  const handleMockResult = useCallback(
-    (result: Omit<PaymentResult, 'reference'>) => {
-      log('INFO', 'Received result from mock dialog.', {
-        result,
-        currentMockReference,
+
+  const handleMockResult = useCallback((result: MockResult) => {
+    setIsProcessingPayment(false);
+    log('INFO', `Mock payment result: ${result}`);
+
+    const reference = `mock_${uuidv4()}`;
+
+    switch (result) {
+      case 'success':
+        handlePaymentResult({
+          status: 'APPROVED',
+          reference,
+          transactionId: `wompi_${uuidv4()}`
+        });
+        break;
+      
+      case 'insufficient':
+        toast({
+          variant: 'destructive',
+          title: 'Error de pago',
+          description: 'Saldo insuficiente. Por favor, intenta con otro método de pago.',
+        });
+        break;
+        
+      case 'error':
+        toast({
+          variant: 'destructive',
+          title: 'Error de pago',
+          description: 'Ocurrió un error técnico. Por favor, reintenta en unos momentos.',
+        });
+        break;
+
+      case 'canceled':
+        addMessage('lia', 'Pago cancelado por el usuario.');
+        break;
+    }
+  }, [addMessage, handlePaymentResult, log, toast]);
+
+
+  const handlePay = useCallback(async () => {
+    setIsProcessingPayment(true);
+    if (isMock) {
+      log('INFO', 'Initiating MOCK payment...');
+      setIsMockModalOpen(true);
+    } else {
+      log('ERROR', 'Real payment gateway not implemented.');
+      toast({
+        variant: 'destructive',
+        title: 'Servicio no disponible',
+        description: 'La pasarela de pago real aún no está implementada.',
       });
-      if (currentMockReference) {
-        handlePaymentResult({...result, reference: currentMockReference});
-      } else {
-        log('ERROR', 'Mock result received but no reference was stored.');
-      }
-      setIsMockModalOpen(false);
-      setCurrentMockReference(null);
-    },
-    [currentMockReference, handlePaymentResult, log]
-  );
+      setIsProcessingPayment(false);
+    }
+  }, [isMock, log, toast]);
 
-  const handlePay = useCallback(() => {
-    log('DEBUG', 'handlePay called. Attempting to set status to generating.');
-    setFlowState(prev => ({...prev, status: 'generating', step: 4}));
-  }, [log]);
 
   const resetFlow = useCallback(() => {
     log('INFO', 'Resetting flow.');
@@ -574,21 +653,6 @@ export default function TramiteFacil() {
     }
   }, [messages]);
 
-  const handleMockClose = () => {
-    log('INFO', 'Mock modal closed by user.');
-    setIsMockModalOpen(false);
-    setIsProcessingPayment(false); // Also reset processing state
-    if (currentMockReference) {
-      handlePaymentResult({
-        status: 'CANCELLED',
-        reference: currentMockReference,
-        transactionId: `mock_${Math.random().toString(36).slice(2, 10)}`,
-        reason: 'Pago cancelado por el usuario',
-      });
-    }
-    setCurrentMockReference(null);
-  };
-
   const OverflowMenu = () => (
     <AlertDialog>
       <DropdownMenu>
@@ -659,48 +723,11 @@ export default function TramiteFacil() {
 
   return (
     <>
-      <Dialog open={isMockModalOpen} onOpenChange={setIsMockModalOpen}>
-        <DialogContent
-          onEscapeKeyDown={handleMockClose}
-          onPointerDownOutside={handleMockClose}
-        >
-          <DialogHeader>
-            <DialogTitle>Mock de Pago</DialogTitle>
-            <DialogDescription>
-              Este es un simulador de pagos. Selecciona un resultado para
-              continuar con el flujo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col space-y-2 py-4">
-            {mockOptions.map(option => (
-              <Button
-                key={option.status}
-                variant="outline"
-                className="h-auto min-h-[44px] justify-start text-left"
-                onClick={() => handleMockResult(option)}
-              >
-                <div className="mr-3">{option.icon}</div>
-                <div className="flex flex-col">
-                  <span className="font-semibold">{option.label}</span>
-                  {option.reason && (
-                    <span className="text-xs text-muted-foreground">
-                      {option.reason}
-                    </span>
-                  )}
-                </div>
-              </Button>
-            ))}
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" onClick={handleMockClose}>
-                Cerrar
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <PaymentMockDialog
+        isOpen={isMockModalOpen}
+        onOpenChange={setIsMockModalOpen}
+        onResult={handleMockResult}
+      />
       <Card
         className="flex h-[90vh] max-h-[800px] w-full max-w-2xl flex-col rounded-2xl border-border bg-card shadow-2xl"
         style={{paddingBottom: keyboardPadding}}
