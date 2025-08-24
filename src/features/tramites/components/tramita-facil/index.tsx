@@ -45,9 +45,7 @@ import {
   logPaymentEvent,
   markTransactionAsPaid,
 } from '@/server/db/collections';
-import type {
-  FlowContext,
-} from '@/server/db/schema';
+import type {FlowContext} from '@/server/db/schema';
 import {initialFlow} from '@/server/db/schema';
 import {
   DropdownMenu,
@@ -66,9 +64,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { buttonVariants } from '@/components/ui/button';
-import type { PaymentResult } from '@/types/payment';
-import { usePaymentMock } from '@/lib/flags';
+import {buttonVariants} from '@/components/ui/button';
+import type {PaymentResult} from '@/types/payment';
+import {usePaymentMock} from '@/lib/flags';
 
 type Message = {
   sender: 'user' | 'lia';
@@ -82,7 +80,6 @@ const getUniqueMessageId = () => {
   messageIdCounter += 1;
   return Date.now() + messageIdCounter;
 };
-
 
 function DocumentGenerationProgress() {
   const [progress, setProgress] = useState(10);
@@ -240,9 +237,9 @@ export default function TramiteFacil() {
   const [currentField, setCurrentField] = useState<number>(0);
   const [isLiaTyping, setIsLiaTyping] = useState<boolean>(false);
   const [userInput, setUserInput] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [showMockModal, setShowMockModal] = useState(false);
   const isMockEnabled = usePaymentMock();
-
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const {toast} = useToast();
@@ -250,16 +247,33 @@ export default function TramiteFacil() {
 
   const addMessage = useCallback(
     (sender: 'user' | 'lia', content: React.ReactNode) => {
-      setMessages((prev) => [...prev, {sender, content, id: getUniqueMessageId()}]);
+      setMessages((prev) => [
+        ...prev,
+        {sender, content, id: getUniqueMessageId()},
+      ]);
     },
     []
   );
 
   const startInitialMessages = useCallback(() => {
-    addMessage('lia', <WelcomeHero onStart={() => document.getElementById('tramite-selector')?.scrollIntoView({behavior: 'smooth'})} />);
-    addMessage('lia', <div id="tramite-selector"><TramiteSelector onSelect={handleTramiteSelect} /></div>)
+    addMessage(
+      'lia',
+      <WelcomeHero
+        onStart={() =>
+          document
+            .getElementById('tramite-selector')
+            ?.scrollIntoView({behavior: 'smooth'})
+        }
+      />
+    );
+    addMessage(
+      'lia',
+      <div id="tramite-selector">
+        <TramiteSelector onSelect={handleTramiteSelect} />
+      </div>
+    );
   }, [addMessage]);
-  
+
   const resetFlow = useCallback(() => {
     setFlowState(initialFlow);
     setSelectedTramite(null);
@@ -275,7 +289,7 @@ export default function TramiteFacil() {
     (tramite: Tramite) => {
       // Keep only the first welcome message, remove the selector
       setMessages((currentMessages) => currentMessages.slice(0, 1));
-      
+
       addMessage('user', `Quiero realizar el trámite: ${tramite.name}`);
       setSelectedTramite(tramite);
       setFlowState({
@@ -300,26 +314,26 @@ export default function TramiteFacil() {
     },
     [addMessage]
   );
-  
+
   const handleCancelFlow = useCallback(
     async (reason?: string) => {
       if (flowState.transactionId) {
         try {
           await cancelTransaction(flowState.transactionId, reason);
         } catch (error) {
-          console.error("Failed to cancel transaction:", error);
+          console.error('Failed to cancel transaction:', error);
           // Non-critical, proceed with UI reset
         }
       }
       resetFlow();
       toast({
-        title: "Proceso cancelado",
-        description: "Puedes iniciar un nuevo trámite cuando quieras.",
+        title: 'Proceso cancelado',
+        description: 'Puedes iniciar un nuevo trámite cuando quieras.',
       });
     },
     [flowState.transactionId, resetFlow, toast]
   );
-  
+
   const OverflowMenu = () => (
     <AlertDialog>
       <DropdownMenu>
@@ -333,7 +347,10 @@ export default function TramiteFacil() {
             Cambiar trámite
           </DropdownMenuItem>
           <AlertDialogTrigger asChild>
-            <DropdownMenuItem className="text-destructive" onSelect={(e) => e.preventDefault()}>
+            <DropdownMenuItem
+              className="text-destructive"
+              onSelect={(e) => e.preventDefault()}
+            >
               Cancelar proceso
             </DropdownMenuItem>
           </AlertDialogTrigger>
@@ -344,10 +361,12 @@ export default function TramiteFacil() {
         <AlertDialogHeader>
           <AlertDialogTitle>¿Cancelar proceso?</AlertDialogTitle>
           <AlertDialogDescription>
-            Se borrará el progreso de este trámite. Esta acción no se puede deshacer.
-             {flowState.status === 'paying' && flowState.transactionId && (
+            Se borrará el progreso de este trámite. Esta acción no se puede
+            deshacer.
+            {flowState.status === 'paying' && flowState.transactionId && (
               <p className="mt-2 text-amber-600">
-                Tu pago no fue procesado. Si ves un cargo pendiente, se reversará automáticamente.
+                Tu pago no fue procesado. Si ves un cargo pendiente, se
+                reversará automáticamente.
               </p>
             )}
           </AlertDialogDescription>
@@ -355,7 +374,13 @@ export default function TramiteFacil() {
         <AlertDialogFooter>
           <AlertDialogCancel>Volver</AlertDialogCancel>
           <AlertDialogAction
-            onClick={() => handleCancelFlow(flowState.status === 'paying' ? 'payment_pending' : 'cancelled_by_user')}
+            onClick={() =>
+              handleCancelFlow(
+                flowState.status === 'paying'
+                  ? 'payment_pending'
+                  : 'cancelled_by_user'
+              )
+            }
             className={cn(buttonVariants({variant: 'destructive'}))}
           >
             Cancelar Proceso
@@ -401,19 +426,34 @@ export default function TramiteFacil() {
   }, [selectedTramite, currentField, addMessage]);
 
   useEffect(() => {
-    if (flowState.status !== 'filling' || isLiaTyping || !selectedTramite) {
+    if (
+      flowState.status !== 'filling' ||
+      isLiaTyping ||
+      !selectedTramite
+    ) {
       return;
     }
-  
+
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return;
-  
-    if (lastMessage.sender === 'user' || (currentField === 0 && lastMessage.sender === 'lia' && (lastMessage.content as React.ReactElement)?.props?.children?.[0]?.props?.children === '¡Excelente elección!')) {
+
+    const isFirstQuestion =
+      currentField === 0 &&
+      lastMessage.sender === 'lia' &&
+      (lastMessage.content as React.ReactElement)?.props?.children?.[0]?.props
+        ?.children === '¡Excelente elección!';
+
+    if (lastMessage.sender === 'user' || isFirstQuestion) {
       askNextQuestion();
     }
-  
-  }, [flowState.status, isLiaTyping, messages, selectedTramite, currentField, askNextQuestion]);
-
+  }, [
+    flowState.status,
+    isLiaTyping,
+    messages,
+    selectedTramite,
+    currentField,
+    askNextQuestion,
+  ]);
 
   const handleUserInput = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -442,7 +482,7 @@ export default function TramiteFacil() {
     setUserInput('');
     setCurrentField((prev) => prev + 1);
   };
-  
+
   const handlePaymentSuccess = useCallback(async () => {
     addMessage(
       'lia',
@@ -452,11 +492,13 @@ export default function TramiteFacil() {
       </div>
     );
     setFlowState((prev) => ({...prev, status: 'generating'}));
-    setIsLiaTyping(true); // Show generating progress
 
     // Simulate API call to mark transaction as paid in our DB
     if (flowState.transactionId) {
-      await markTransactionAsPaid(flowState.transactionId, `wompi_${Date.now()}`);
+      await markTransactionAsPaid(
+        flowState.transactionId,
+        `wompi_${Date.now()}`
+      );
     }
 
     // Simulate document generation delay
@@ -465,44 +507,73 @@ export default function TramiteFacil() {
         await markTransactionAsDelivered(flowState.transactionId);
       }
       setFlowState((prev) => ({...prev, step: 4, status: 'completed'}));
-      setIsLiaTyping(false); // Hide progress, show result
       addMessage('lia', <SuccessCelebration onReset={resetFlow} />);
     }, 7000);
   }, [addMessage, flowState.transactionId, resetFlow]);
-  
-  const handlePaymentResult = useCallback(async (result: PaymentResult) => {
-    setShowMockModal(false);
-    setIsLiaTyping(false);
-    
-    // This is the orchestrator. It ensures operations happen in sequence.
-    await logPaymentEvent(result);
-    setFlowState((prev) => ({ ...prev, transactionId: result.reference }));
-  
-    switch (result.status) {
-      case 'APPROVED':
-        await handlePaymentSuccess();
-        break;
-      case 'DECLINED':
-        addMessage('lia', <div className="flex items-center gap-2"><AlertTriangle className="text-amber-500" /><span>Pago rechazado: {result.reason}</span></div>);
-        break;
-      case 'CANCELLED':
-        addMessage('lia', <div className="flex items-center gap-2"><Ban className="text-red-500" /><span>{result.reason}</span></div>);
-        break;
-      case 'ERROR':
-        addMessage('lia', <div className="flex items-center gap-2"><XCircle className="text-destructive" /><span>Error de pago: {result.reason}</span></div>);
-        break;
-    }
-  }, [addMessage, handlePaymentSuccess]);
+
+  const handlePaymentResult = useCallback(
+    async (result: PaymentResult) => {
+      setShowMockModal(false);
+      setIsProcessingPayment(false);
+
+      await logPaymentEvent(result);
+      setFlowState((prev) => ({...prev, transactionId: result.reference}));
+
+      switch (result.status) {
+        case 'APPROVED':
+          await handlePaymentSuccess();
+          break;
+        case 'DECLINED':
+          addMessage(
+            'lia',
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500" />
+              <span>Pago rechazado: {result.reason}</span>
+            </div>
+          );
+          break;
+        case 'CANCELLED':
+          addMessage(
+            'lia',
+            <div className="flex items-center gap-2">
+              <Ban className="text-red-500" />
+              <span>{result.reason}</span>
+            </div>
+          );
+          break;
+        case 'ERROR':
+          addMessage(
+            'lia',
+            <div className="flex items-center gap-2">
+              <XCircle className="text-destructive" />
+              <span>Error de pago: {result.reason}</span>
+            </div>
+          );
+          break;
+      }
+    },
+    [addMessage, handlePaymentSuccess]
+  );
 
   const handlePayClick = () => {
-    setIsLiaTyping(true); 
-    setShowMockModal(true);
+    setIsProcessingPayment(true);
+    // Simulate API call or some async work before showing the modal
+    setTimeout(() => {
+      if (isMockEnabled) {
+        setShowMockModal(true);
+      } else {
+        // Real payment logic would go here
+        console.log('Initiating real payment...');
+      }
+    }, 500); // Short delay to simulate processing
   };
 
-
-  const currentStep = flowState.step;
-
-  const showChatInterface = flowState.status !== 'selecting';
+  const getVisibleMessages = () => {
+    if (flowState.step === 1) {
+      return messages.slice(0, 2);
+    }
+    return messages.slice(1);
+  };
 
   return (
     <Card
@@ -521,11 +592,17 @@ export default function TramiteFacil() {
             <p className="text-sm text-muted-foreground">Asistente LIA</p>
           </div>
         </div>
-        {currentStep > 1 ? <OverflowMenu /> : <Button variant="ghost" size="icon" onClick={resetFlow}><RefreshCcw className="w-5 h-5" /></Button>}
+        {flowState.step > 1 ? (
+          <OverflowMenu />
+        ) : (
+          <Button variant="ghost" size="icon" onClick={resetFlow}>
+            <RefreshCcw className="h-5 w-5" />
+          </Button>
+        )}
       </CardHeader>
 
       <div className="sticky top-0 z-20 border-b bg-card/80 p-0 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <AdaptiveStepper current={currentStep as 1 | 2 | 3 | 4} />
+        <AdaptiveStepper current={flowState.step as 1 | 2 | 3 | 4} />
         {selectedTramite && (
           <p className="border-t border-border/50 py-1 text-center text-xs text-muted-foreground">
             Trámite: <strong>{selectedTramite.name}</strong>
@@ -539,109 +616,107 @@ export default function TramiteFacil() {
           ref={scrollAreaRef}
           aria-live="polite"
         >
-            <div className="space-y-6 p-6">
-                {messages.map((msg) => (
-                    // When status is not 'selecting', we hide the initial welcome and selector
-                    <div key={msg.id} className={cn(showChatInterface && messages.indexOf(msg) < 2 && 'hidden')}>
-                        {msg.sender === 'lia' ? (
-                            <ChatBubble sender="lia" content={msg.content} />
-                        ) : (
-                            <ChatBubble sender="user" content={msg.content} />
-                        )}
-                    </div>
-                ))}
+          <div className="space-y-6 p-6">
+            {getVisibleMessages().map((msg) => (
+              <div key={msg.id}>
+                {msg.sender === 'lia' ? (
+                  <ChatBubble sender="lia" content={msg.content} />
+                ) : (
+                  <ChatBubble sender="user" content={msg.content} />
+                )}
+              </div>
+            ))}
 
-                {isLiaTyping && flowState.status !== 'generating' && (
-                <ChatBubble
-                    sender="lia"
-                    content={<Loader2 className="animate-spin" />}
-                />
-                )}
-                {flowState.status === 'generating' && (
-                    <ChatBubble sender="lia" content={<DocumentGenerationProgress />} />
-                )}
-                {flowState.status === 'paying' && selectedTramite && (
-                <ChatBubble
-                    sender="lia"
-                    content={
-                    <Payment
-                        tramiteName={selectedTramite.name}
-                        price={selectedTramite.priceCop}
-                        onPay={handlePayClick}
-                        isProcessing={isLiaTyping}
-                    />
-                    }
-                />
-                )}
-                {flowState.status === 'completed' && selectedTramite && (
-                <ChatBubble
-                    sender="lia"
-                    content={
-                    <DocumentDownloader
-                        tramiteName={selectedTramite.name}
-                        onReset={resetFlow}
-                    />
-                    }
-                />
-                )}
-            </div>
+            {isLiaTyping && (
+              <ChatBubble
+                sender="lia"
+                content={<Loader2 className="animate-spin" />}
+              />
+            )}
+
+            {flowState.status === 'paying' && selectedTramite && (
+              <ChatBubble
+                sender="lia"
+                content={
+                  <Payment
+                    tramiteName={selectedTramite.name}
+                    price={selectedTramite.priceCop}
+                    onPay={handlePayClick}
+                    isProcessing={isProcessingPayment}
+                  />
+                }
+              />
+            )}
+
+            {flowState.status === 'generating' && (
+              <ChatBubble sender="lia" content={<DocumentGenerationProgress />} />
+            )}
+            
+            {flowState.status === 'completed' && selectedTramite && (
+              <ChatBubble
+                sender="lia"
+                content={
+                  <DocumentDownloader
+                    tramiteName={selectedTramite.name}
+                    onReset={resetFlow}
+                  />
+                }
+              />
+            )}
+          </div>
         </ScrollArea>
         {showMockModal && (
-          <PaymentMock 
+          <PaymentMock
             open={showMockModal}
             onClose={() => {
               setShowMockModal(false);
-              // Only re-enable pay button if payment wasn't approved
-              if (flowState.status === 'paying') {
-                 setIsLiaTyping(false);
-              }
+              setIsProcessingPayment(false);
             }}
             onResult={handlePaymentResult}
           />
         )}
       </CardContent>
 
-      <div
-        className={cn(
-          'sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-bottom:env(safe-area-inset-bottom)]',
-          flowState.status !== 'filling' && 'hidden'
-        )}
-      >
-        <div className="flex w-full items-center space-x-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={resetFlow}
-            disabled={isLiaTyping}
-            aria-label="Atrás"
-            className="min-h-[44px] min-w-[44px]"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <form
-            onSubmit={handleUserInput}
-            className="flex flex-1 items-center space-x-2"
-          >
-            <Input
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              placeholder={'Escribe tu respuesta aquí...'}
-              disabled={isLiaTyping}
-              className="h-11 flex-1 text-base"
-              aria-label="Entrada de usuario"
-            />
+      {flowState.status === 'filling' && (
+        <div
+          className="sticky bottom-0 z-20 border-t bg-card/80 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/60 [padding-bottom:env(safe-area-inset-bottom)]"
+        >
+          <div className="flex w-full items-center space-x-2">
             <Button
-              type="submit"
+              variant="outline"
               size="icon"
-              disabled={isLiaTyping || !userInput.trim()}
-              aria-label="Enviar mensaje"
+              onClick={resetFlow}
+              disabled={isLiaTyping}
+              aria-label="Atrás"
               className="min-h-[44px] min-w-[44px]"
             >
-              <Send className="h-5 w-5" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-          </form>
+            <form
+              onSubmit={handleUserInput}
+              className="flex flex-1 items-center space-x-2"
+            >
+              <Input
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                placeholder={'Escribe tu respuesta aquí...'}
+                disabled={isLiaTyping}
+                className="h-11 flex-1 text-base"
+                aria-label="Entrada de usuario"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                disabled={isLiaTyping || !userInput.trim()}
+                aria-label="Enviar mensaje"
+                className="min-h-[44px] min-w-[44px]"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </Card>
   );
 }
