@@ -8,21 +8,19 @@ import { v4 as uuidv4 } from 'uuid';
 import { getFirebaseFunctions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import type { PaymentInput, PaymentResult } from '@/types/payment';
-import { useMockProvider } from './mock';
 
 type UsePaymentProps = {
   onSuccess: (result: PaymentResult) => void;
   onError: (result: PaymentResult) => void;
+  showMockModal: (reference: string) => void;
 };
 
-export function usePayment({onSuccess, onError}: UsePaymentProps) {
+export function usePayment({onSuccess, onError, showMockModal}: UsePaymentProps) {
   const isMock = usePaymentMock();
   const {log} = useAppLogger('PaymentProvider');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { showMockModal } = useMockProvider({ onResult: handlePaymentResult });
-
-  function handlePaymentResult(result: PaymentResult) {
+  const handlePaymentResult = useCallback((result: PaymentResult) => {
     log('INFO', 'Handling payment result from provider', { result });
     setIsProcessing(false);
     if (result.status === 'APPROVED') {
@@ -30,7 +28,7 @@ export function usePayment({onSuccess, onError}: UsePaymentProps) {
     } else {
       onError(result);
     }
-  }
+  }, [log, onSuccess, onError]);
 
   const initiateMockPayment = useCallback((input: PaymentInput) => {
     const reference = `MOCK-${uuidv4()}`;
@@ -41,6 +39,7 @@ export function usePayment({onSuccess, onError}: UsePaymentProps) {
   const initiateRealPayment = useCallback(async (input: PaymentInput) => {
     const reference = `WM-${uuidv4()}`;
     log('INFO', 'Initiating REAL payment with Wompi', { input, reference });
+    setIsProcessing(true);
     
     const functions = getFirebaseFunctions();
     const createWompiTransaction = httpsCallable(functions, 'createWompiTransaction');
@@ -75,7 +74,7 @@ export function usePayment({onSuccess, onError}: UsePaymentProps) {
         reason: 'Error de comunicación con el servidor de pagos.'
       });
     }
-  }, [log]);
+  }, [log, handlePaymentResult]);
   
   const initiatePayment = useCallback(async (input: PaymentInput) => {
     setIsProcessing(true);
@@ -86,5 +85,5 @@ export function usePayment({onSuccess, onError}: UsePaymentProps) {
     }
   }, [isMock, initiateMockPayment, initiateRealPayment]);
 
-  return {isProcessingPayment: isProcessing, initiatePayment};
+  return {isProcessingPayment: isProcessing, initiatePayment, handlePaymentResult};
 }

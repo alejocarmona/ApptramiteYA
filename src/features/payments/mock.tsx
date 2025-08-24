@@ -47,32 +47,37 @@ export function useMockProvider({ onResult }: UseMockProviderProps) {
     setCurrentReference(null);
   }, [currentReference, onResult, log]);
 
-  // Use a portal to render the dialog at the root level
-  const MockModalPortal = () => {
+  const MockModalPortal = useCallback(() => {
     if (typeof document === 'undefined') return null; // Guard for SSR
+    
+    const portalRoot = document.getElementById('mock-payment-portal-root');
+    if (!portalRoot) {
+      if (typeof document !== 'undefined') {
+        const newPortalRoot = document.createElement('div');
+        newPortalRoot.id = 'mock-payment-portal-root';
+        document.body.appendChild(newPortalRoot);
+        return ReactDOM.createPortal(
+          <PaymentMockDialog
+            open={isModalOpen}
+            onClose={handleClose}
+            onResult={handleResult}
+          />,
+          newPortalRoot
+        );
+      }
+      return null;
+    }
+
     return ReactDOM.createPortal(
       <PaymentMockDialog
         open={isModalOpen}
         onClose={handleClose}
         onResult={handleResult}
       />,
-      document.body
+      portalRoot
     );
-  };
+  }, [isModalOpen, handleClose, handleResult]);
 
-  // This is a bit of a trick to include the portal in the app tree
-  // A cleaner way might be a context provider at the root layout
-  useState(() => {
-    if (typeof window !== 'undefined') {
-      const existing = document.getElementById('mock-payment-portal');
-      if (!existing) {
-        const portalContainer = document.createElement('div');
-        portalContainer.id = 'mock-payment-portal';
-        document.body.appendChild(portalContainer);
-        ReactDOM.render(<MockModalPortal />, portalContainer);
-      }
-    }
-  });
 
-  return { showMockModal };
+  return { showMockModal, MockModalPortal };
 }
